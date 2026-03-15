@@ -14,6 +14,10 @@ This project is based on source code of Minecraft Legacy Console Edition v1.6.05
 
 ## Latest:
 
+In-game screenshot functionality with F2!
+- pressing F2 will save a screenshot to a `screenshots` folder in your root game directory
+- a local-only chat message is shown to the player notifying the screenshot filename that was saved
+
 Proper implementation of Hardcore Mode in LCE!
 - difficulty slider included in create world menu
 - difficulty slider forces "Difficulty: Hardcore" on world load
