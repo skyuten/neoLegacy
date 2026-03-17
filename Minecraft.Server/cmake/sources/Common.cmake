@@ -130,6 +130,7 @@ set(_MINECRAFT_SERVER_COMMON_ROOT
   "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Client/Common/UI/IUIScene_StartGame.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Client/Common/UI/IUIScene_TradingMenu.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Client/Common/UI/UIBitmapFont.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Client/Common/UI/UIUnicodeBitmapFont.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Client/Common/UI/UIComponent_Chat.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Client/Common/UI/UIComponent_DebugUIConsole.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Client/Common/UI/UIComponent_DebugUIMarketingGuide.cpp"

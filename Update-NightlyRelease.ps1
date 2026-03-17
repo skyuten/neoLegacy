@@ -4,7 +4,7 @@
     Builds zips for client and server, updates their Nightly GitHub releases, and archives locally.
 .DESCRIPTION
     1. Fetches the latest commit hash.
-    2. Zips client (x64\Release) and server (x64\Minecraft.Server\Release) builds into the archive folder.
+    2. Zips client (build\Minecraft.Client\Release) and server (build\Minecraft.Server\Release) builds into the archive folder.
     3. Updates the Nightly release: deletes old assets, uploads client zip + exe + pdb, updates title.
     4. Updates the Nightly-Dedicated-Server release: deletes old assets, uploads server zip, updates title.
 .NOTES
@@ -18,10 +18,10 @@ $ErrorActionPreference = "Stop"
 $RepoOwner       = "itsRevela"
 $RepoName        = "MinecraftConsoles"
 $ReleaseTag      = "Nightly"
-$ReleaseDir      = Join-Path $PSScriptRoot "x64\Release"
+$ReleaseDir      = Join-Path $PSScriptRoot "build\Minecraft.Client\Release"
 $ZipName         = "LCEWindows64.zip"
 $ServerReleaseTag  = "Nightly-Dedicated-Server"
-$ServerReleaseDir  = Join-Path $PSScriptRoot "x64\Minecraft.Server\Release"
+$ServerReleaseDir  = Join-Path $PSScriptRoot "build\Minecraft.Server\Release"
 $ServerZipName     = "LCEServerWindows64.zip"
 $ArchiveRoot     = "C:\Users\rexma\Documents\Minecraft\itsRevelaReleases"
 $ApiBase         = "https://api.github.com/repos/$RepoOwner/$RepoName"

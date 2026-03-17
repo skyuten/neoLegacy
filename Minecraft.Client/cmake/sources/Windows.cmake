@@ -24,6 +24,8 @@ set(_MINECRAFT_CLIENT_WINDOWS_COMMON_UI
   "${CMAKE_CURRENT_SOURCE_DIR}/Common/UI/UIBitmapFont.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/Common/UI/UIController.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/Common/UI/UIController.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/Common/UI/UIUnicodeBitmapFont.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/Common/UI/UIUnicodeBitmapFont.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/Common/UI/UIGroup.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/Common/UI/UIGroup.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/Common/UI/UILayer.cpp"
