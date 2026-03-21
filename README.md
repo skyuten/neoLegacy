@@ -14,6 +14,11 @@ This project is based on source code of Minecraft Legacy Console Edition v1.6.05
 
 ## Latest:
 
+Music context fixes:
+- Menu music (menu1-4) now plays only on the title screen
+- creative music (creative1-6) only plays in creative mode
+- survival mode plays only calm/hal/nuance/piano tracks
+
 Performance optimizations across rendering, audio, and entity systems!
 - Renderer: column-level frustum culling and compact visible-chunk lists skip thousands of empty iterations per frame; lightweight second-pass render path avoids redundant checks
 - Sound engine: filesystem probe results are now cached, eliminating repeated file-existence checks every time a sound plays; sounds are pre-decoded for smoother playback
