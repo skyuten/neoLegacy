@@ -825,9 +825,7 @@ void PlayerConnection::handleInteract(shared_ptr<InteractPacket> packet)
 		{
 			if ((target->GetType() == eTYPE_ITEMENTITY) || (target->GetType() == eTYPE_EXPERIENCEORB) || (target->GetType() == eTYPE_ARROW) || target == player)
 			{
-				//disconnect("Attempting to attack an invalid entity");
-				//server.warn("Player " + player.getName() + " tried to attack an invalid entity");
-				return;
+					return;
 			}
 			player->attack(target);
 		}

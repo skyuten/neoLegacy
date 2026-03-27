@@ -14,6 +14,11 @@ This project is based on source code of Minecraft Legacy Console Edition v1.6.05
 
 ## Latest:
 
+End dimension fixes for dedicated servers:
+- Fixed the Ender Dragon being immune to melee damage on dedicated servers. The server's entity ID allocator (smallId pool) assigned non-sequential IDs to the dragon's body parts, but the client assumed sequential offsets. Melee attacks targeted IDs the server didn't recognize, so hits were silently dropped. The server now reassigns sub-entity IDs to be sequential from the parent when an entity with parts is added to the level
+- Fixed entering the End exit portal after defeating the dragon crashing the game. The player entity was never added to the Overworld level during the dimension transition, leaving the player as a ghost entity that caused a crash on the next interaction
+- Fixed the End Poem crashing the client on dedicated servers due to an out-of-bounds player index lookup in the WIN_GAME event handler
+
 Dedicated server player list fix:
 - The Tab player list now correctly shows all connected players on dedicated servers. Previously only the local player was visible because remote players were never registered in the client's network player tracking when their `AddPlayerPacket` arrived
 - The dedicated server's phantom host entry (slot 0, empty name) is now filtered from the list

@@ -1052,9 +1052,14 @@ void ServerLevel::entityAdded(shared_ptr<Entity> e)
 	vector<shared_ptr<Entity> > *es = e->getSubEntities();
 	if (es)
 	{
+		// Reassign sub-entity IDs to be sequential from the parent's ID.
+		// The client assumes this layout when it applies an offset in handleAddMob.
+		int offset = 1;
 		for(auto& i : *es)
 		{
+			i->entityId = e->entityId + offset;
 			entitiesById.emplace(i->entityId, i);
+			offset++;
 		}
 	}
 	entityAddedExtra(e);	// 4J added

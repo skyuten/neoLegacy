@@ -965,15 +965,16 @@ void PlayerList::repositionAcrossDimension(shared_ptr<Entity> entity, int lastDi
 		addPlayerToReceiving(player);
 	}
 
-	if (lastDimension != 1)
+	xt = static_cast<double>(Mth::clamp(static_cast<int>(xt), -Level::MAX_LEVEL_SIZE + 128, Level::MAX_LEVEL_SIZE - 128));
+	zt = static_cast<double>(Mth::clamp(static_cast<int>(zt), -Level::MAX_LEVEL_SIZE + 128, Level::MAX_LEVEL_SIZE - 128));
+	if (entity->isAlive())
 	{
-		xt = static_cast<double>(Mth::clamp(static_cast<int>(xt), -Level::MAX_LEVEL_SIZE + 128, Level::MAX_LEVEL_SIZE - 128));
-		zt = static_cast<double>(Mth::clamp(static_cast<int>(zt), -Level::MAX_LEVEL_SIZE + 128, Level::MAX_LEVEL_SIZE - 128));
-		if (entity->isAlive())
+		newLevel->addEntity(entity);
+		entity->moveTo(xt, entity->y, zt, entity->yRot, entity->xRot);
+		newLevel->tick(entity, false);
+		// Portal forcing only for non-End exits (End exits go to spawn, not a portal)
+		if (lastDimension != 1)
 		{
-			newLevel->addEntity(entity);
-			entity->moveTo(xt, entity->y, zt, entity->yRot, entity->xRot);
-			newLevel->tick(entity, false);
 			newLevel->cache->autoCreate = true;
 			newLevel->getPortalForcer()->force(entity, xOriginal, yOriginal, zOriginal, yRotOriginal);
 			newLevel->cache->autoCreate = false;
