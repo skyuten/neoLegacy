@@ -100,23 +100,21 @@ UIScene_SettingsGraphicsMenu::UIScene_SettingsGraphicsMenu(int iPad, void *initD
 	// if we're not in the game, we need to use basescene 0
 	if(bInGame)
 	{
-		// If the game has started, then you need to be the host to change the in-game gamertags
+#ifndef _WINDOWS64
+		// Console splitscreen: non-host and non-primary players can't change world-level settings
 		if(bIsPrimaryPad)
-		{	
-			// we are the primary player on this machine, but not the game host
-			// are we the game host? If not, we need to remove the bedrockfog setting
+		{
 			if(!g_NetworkManager.IsHost())
 			{
-				// hide the in-game bedrock fog setting
 				removeControl(&m_checkboxBedrockFog, true);
 			}
 		}
 		else
 		{
-			// We shouldn't have the bedrock fog option, or the m_CustomSkinAnim option
 			removeControl(&m_checkboxBedrockFog, true);
 			removeControl(&m_checkboxCustomSkinAnim, true);
 		}
+#endif
 	}
 
 	if(app.GetLocalPlayerCount()>1)
