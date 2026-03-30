@@ -569,15 +569,10 @@ public:
 	HRESULT STDMETHODCALLTYPE GetDevice(REFIID riid, void** ppDevice) override { return m_pReal->GetDevice(riid, ppDevice); }
 
 	// IDXGISwapChain
-	HRESULT STDMETHODCALLTYPE Present(UINT SyncInterval, UINT Flags) override
-	{
-		if (g_bVSync)
-			return m_pReal->Present(1, Flags);
-		// DXGI_PRESENT_ALLOW_TEARING is only valid in windowed mode
-		if (g_bTearingSupported)
-			Flags |= DXGI_PRESENT_ALLOW_TEARING;
-		return m_pReal->Present(0, Flags);
-	}
+	// NOTE: The 4J RenderManager library hardcodes SyncInterval=1 and does NOT
+	// dispatch Present through this proxy's vtable.  VSync control is handled
+	// directly in the main loop (see the Present-the-frame block) instead.
+	HRESULT STDMETHODCALLTYPE Present(UINT SyncInterval, UINT Flags) override { return m_pReal->Present(SyncInterval, Flags); }
 	HRESULT STDMETHODCALLTYPE GetBuffer(UINT Buffer, REFIID riid, void** ppSurface) override { return m_pReal->GetBuffer(Buffer, riid, ppSurface); }
 	HRESULT STDMETHODCALLTYPE SetFullscreenState(BOOL Fullscreen, IDXGIOutput* pTarget) override { return m_pReal->SetFullscreenState(Fullscreen, pTarget); }
 	HRESULT STDMETHODCALLTYPE GetFullscreenState(BOOL* pFullscreen, IDXGIOutput** ppTarget) override { return m_pReal->GetFullscreenState(pFullscreen, ppTarget); }
@@ -1904,7 +1899,20 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		RenderManager.Set_matrixDirty();
 #endif
 		// Present the frame.
-		RenderManager.Present();
+		// RenderManager.Present() hardcodes SyncInterval=1 internally.
+		// When VSync is off, bypass it and call the swap chain directly.
+		if (!g_bVSync && g_bTearingSupported && g_pSwapChain)
+		{
+			HRESULT hrPresent = g_pSwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+			// If tearing Present fails (e.g. during fullscreen transition),
+			// fall back to the library's VSync'd Present for this frame.
+			if (FAILED(hrPresent))
+				RenderManager.Present();
+		}
+		else
+		{
+			RenderManager.Present();
+		}
 
 		ui.CheckMenuDisplayed();
 
@@ -1998,6 +2006,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		if (g_KBMInput.IsKeyPressed(KeyboardMouseInput::KEY_FULLSCREEN))
 		{
 			ToggleFullscreen();
+			app.SetGameSettings(ProfileManager.GetPrimaryPad(), eGameSetting_ExclusiveFullscreen, g_isFullscreen ? 1 : 0);
 		}
 
 		// Apply deferred exclusive fullscreen toggle

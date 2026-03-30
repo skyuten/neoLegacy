@@ -14,6 +14,15 @@ This project is based on source code of Minecraft Legacy Console Edition v1.6.05
 
 ## Latest:
 
+### Uncapped FPS (VSync Off)
+
+- FPS is no longer locked to the monitor's refresh rate when VSync is disabled. The precompiled 4J render library hardcodes `SyncInterval=1` in its Present call, which forced VBlank synchronization regardless of the VSync setting. The main loop now bypasses the library's Present and calls the DXGI swap chain directly with `SyncInterval=0` and `DXGI_PRESENT_ALLOW_TEARING` when VSync is off
+- Pressing F11 to toggle fullscreen now correctly syncs the Fullscreen checkbox in the graphics settings menu
+
+### Graphics Settings Fixes
+
+- The graphics menu layout has been fixed: the render distance slider is now no longer occluded by the gamma slider. Also, resolved spacing erro for the checkbox options due to an incomplete removal of the Bedrock Fog toggle option (the setting has been reinstated).
+
 ### Hardcore Hearts
 
 ![Hardcore Hearts](.github/hardcore-hearts.png)

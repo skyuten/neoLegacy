@@ -2349,7 +2349,7 @@ void CMinecraftApp::SetGameSettings(int iPad,eGameSetting eVal,unsigned char ucV
 		break;
 
 	case eGameSetting_VSync:
-		if(((GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_VSYNC)>>18)!=(ucVal&0x01))
+		if(((GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_VSYNC)>>24)!=(ucVal&0x01))
 		{
 			if(ucVal==1)
 			{
@@ -2365,7 +2365,7 @@ void CMinecraftApp::SetGameSettings(int iPad,eGameSetting eVal,unsigned char ucV
 		break;
 
 	case eGameSetting_ExclusiveFullscreen:
-		if(((GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_EXCLUSIVEFULLSCREEN)>>19)!=(ucVal&0x01))
+		if(((GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_EXCLUSIVEFULLSCREEN)>>25)!=(ucVal&0x01))
 		{
 			if(ucVal==1)
 			{
@@ -2516,10 +2516,10 @@ unsigned char CMinecraftApp::GetGameSettings(int iPad,eGameSetting eVal)
 		return (GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_PSVITANETWORKMODEADHOC)>>17;
 
 	case eGameSetting_VSync:
-		return (GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_VSYNC)>>18;
+		return (GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_VSYNC)>>24;
 
 	case eGameSetting_ExclusiveFullscreen:
-		return (GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_EXCLUSIVEFULLSCREEN)>>19;
+		return (GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_EXCLUSIVEFULLSCREEN)>>25;
 
 	}
 	return 0;
