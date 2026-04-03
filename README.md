@@ -3,8 +3,9 @@
 This project aims to backport the newer title updates back to the Minecraft: Legacy Console Edition Source Code (which is based on TU19).
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white)](https://discord.gg/D6hEPNYeyn)
-[![Get it on Emerald Legacy Launcher](.gitea/emerald_badge.png)](https://emerald-legacy-launcher.github.io/)
-
+<a href="https://emerald-legacy-launcher.github.io/">
+  <img src=".gitea/emerald_badge.png" alt="Get it on Emerald Legacy Launcher" height="60">
+</a>
 
 # Our roadmap:
 ![Roadmap](.gitea/roadmap.png)
