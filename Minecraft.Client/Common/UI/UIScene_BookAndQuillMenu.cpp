@@ -6,7 +6,7 @@
 #include "ClientConnection.h"
 #include "..\Minecraft.Client\PlayerList.h"
 #include "..\Minecraft.Client\ServerPlayer.h"
-#include "..\Minecraft.Client\MultiplayerLocalPlayer.h"
+#include "..\Minecraft.Client\MultiPlayerLocalPlayer.h"
 
 UIScene_BookAndQuillMenu::UIScene_BookAndQuillMenu(int iPad, void *initData, UILayer *parentLayer) : UIScene(iPad, parentLayer)
 {
