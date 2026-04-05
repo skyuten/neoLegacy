@@ -4,7 +4,7 @@
 #include "ItemInstance.h"
 #include "WritingBookItem.h"
 #include "../Minecraft.Client/Minecraft.h"
-#include "../Minecraft.Client/MultiplayerLocalPlayer.h"
+#include "../Minecraft.Client/MultiPlayerLocalPlayer.h"
 
 WritingBookItem::WritingBookItem(int id) : Item(id)
 {
