@@ -14,10 +14,7 @@
 #include "../Minecraft.World/FishingHelper.h"
 #include "../Minecraft.World/EnchantmentHelper.h"
 #include "../Minecraft.World/Enchantment.h"
-
 #include "../Minecraft.World/ItemInstance.h"
-
-#include <mutex>
 
 // 4J - added common ctor code.
 void FishingHook::_init()
