@@ -70,10 +70,9 @@ class FishingHelper
 		WeighedRandomItemArray fishingJunkArray;
 		WeighedRandomItemArray fishingTreasuresArray;
 	public:
-		
+		// Setup singleton
 		FishingHelper(const FishingHelper&) = delete;
 		FishingHelper& operator=(const FishingHelper&) = delete;
-
 		static FishingHelper* getInstance();
 
 		CatchType getRandCatchType(int level);
