@@ -50,16 +50,16 @@ CatchType FishingHelper::getRandCatchType(int luck, Random* random)
 	CatchTypeWeighedItem* catchTypeWeighedItem = nullptr;
 	catchTypeArray.calcWeights(luck); // Recalculate the weights based on the luck level of the player
 	catchTypeWeighedItem = static_cast<CatchTypeWeighedItem *>(WeighedRandom::getRandomItem(random, catchTypeArray));
+    return catchTypeWeighedItem->getType();
 }
 
 CatchWeighedItem* FishingHelper::getRandCatch(CatchType catchType, Random* random)
 {
-	CatchWeighedItem* catchWeighedItem = nullptr;
 	switch (catchType) {
 		case CatchType::FISH:
 			return static_cast<CatchWeighedItem *>(WeighedRandom::getRandomItem(random, fishingFishArray));
 		case CatchType::TREASURE:
-			return static_cast<CatchWeighedItem *>(WeighedRandom::getRandomItem(random, fishingTreasuresArray));;
+			return static_cast<CatchWeighedItem *>(WeighedRandom::getRandomItem(random, fishingTreasuresArray));
 		case CatchType::JUNK:
 			return static_cast<CatchWeighedItem *>(WeighedRandom::getRandomItem(random, fishingJunkArray));
 	}
@@ -75,11 +75,11 @@ std::shared_ptr<ItemInstance> FishingHelper::handleCatch(CatchWeighedItem* weigh
 		itemInstance->setAuxValue((int) (itemInstance->getMaxDamage() * ((double) random->nextInt(901) + 100.0) / 1000.0)); // 10% to 100% damage 
 	}
 	else if (itemInstance->id == Item::fishingRod_Id && catchType == CatchType::TREASURE) {
-		itemInstance->setAuxValue((int)(itemInstance->getMaxDamage() * ((double)random->nextInt(251) / 1000.0)); // 0% to 25% damage
+		itemInstance->setAuxValue((int)(itemInstance->getMaxDamage() * ((double)random->nextInt(251) / 1000.0))); // 0% to 25% damage
 		itemInstance = EnchantmentHelper::enchantItem(random, itemInstance, 30);
 	}
 	else if (itemInstance->id == Item::bow_Id) {
-		itemInstance->setAuxValue((int)(itemInstance->getMaxDamage() * ((double)random->nextInt(251) / 1000.0)); // 0% to 25% damage
+		itemInstance->setAuxValue((int)(itemInstance->getMaxDamage() * ((double)random->nextInt(251) / 1000.0))); // 0% to 25% damage
 		itemInstance = EnchantmentHelper::enchantItem(random, itemInstance, 30);
 	}
 	else if (itemInstance->id == Item::book_Id) {
