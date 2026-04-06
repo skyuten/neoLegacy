@@ -170,6 +170,14 @@ bool DLCAudioFile::processDLCDataFile(PBYTE pbData, DWORD dwLength)
 	for(unsigned int i=0;i<uiFileCount;i++)
 	{
 		EAudioType type = static_cast<EAudioType>(pFile->dwType);
+
+		//Bounds Checking
+		if (type < 0 || type >= e_AudioType_Max) 
+		{
+			app.DebugPrintf("Error parser: EAudioType (%d) out of bounds!\n", type);
+			
+			continue; 
+		}
 		// Params
 		unsigned int uiParameterCount=*(unsigned int *)pbTemp;
 		pbTemp+=sizeof(int);
@@ -182,7 +190,8 @@ bool DLCAudioFile::processDLCDataFile(PBYTE pbData, DWORD dwLength)
 
 			if(it != parameterMapping.end() )
 			{
- 				addParameter(type,static_cast<EAudioParameterType>(pParams->dwType),(WCHAR *)pParams->wchData);
+ 				//addParameter(type,static_cast<EAudioParameterType>(pParams->dwType),(WCHAR *)pParams->wchData);
+				addParameter(type, it->second, (WCHAR *)pParams->wchData);
 			}
 			pbTemp+=sizeof(C4JStorage::DLC_FILE_PARAM)+(sizeof(WCHAR)*pParams->dwWchCount);
 			pParams = (C4JStorage::DLC_FILE_PARAM *)pbTemp;
