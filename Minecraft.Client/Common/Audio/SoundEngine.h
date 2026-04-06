@@ -47,6 +47,11 @@ enum eMUSICFILES
 	// The End
 	eStream_end_dragon,
 	eStream_end_end,
+    // Battle
+    eStream_BattleMode1,
+    eStream_BattleMode2,
+    eStream_BattleMode3,
+    eStream_BattleMode4,
 	eStream_CD_1,
 	eStream_CD_2,
 	eStream_CD_3,
@@ -60,6 +65,26 @@ enum eMUSICFILES
 	eStream_CD_11,
 	eStream_CD_12,
 	eStream_Max,
+};
+
+// @3UR: This may not even be an enum—this is mostly guesswork.
+// Why? Previously it used LevelData::DIMENSION_XXX enum, and it's unlikely they
+// would have extended that with all this additional data.
+// It also does not match up in IDA: LevelData::DIMENSION_END is 1,
+// but now we see getMusicId(v5, 4); instead of 1.
+//
+// This suggests they likely introduced an entirely new enum.
+//
+// Additionally, there was never a case for 3, so it's skipped.
+// That might indicate they extended an existing enum, but it's unclear.
+enum eMUSICDOMAIN
+{
+    eMusicDomain_Nether = 0,
+    eMusicDomain_Overworld = 1,
+    eMusicDomain_Menu = 2,
+    eMusicDomain_End = 4,
+    eMusicDomain_Creative = 5,
+    eMusicDomain_Battle = 6,
 };
 
 enum eMUSICTYPE
@@ -134,7 +159,7 @@ public:
 	bool isStreamingWavebankReady();		// 4J Added
 	int getMusicID(int iDomain);
 	int getMusicID(const wstring& name);
-	void SetStreamingSounds(int iOverworldMin, int iOverWorldMax, int iNetherMin, int iNetherMax, int iEndMin, int iEndMax, int iCD1);
+    void SetStreamingSounds(int iOverworldMin, int iOverWorldMax, int iNetherMin, int iNetherMax, int iEndMin, int iEndMax, int iCreativeMin, int iCreativeMax, int iMenuMin, int iMenuMax, int iBattleMin, int iBattleMax, int iCD1);
 	void updateMiniAudio();
 	void playMusicUpdate();
 
@@ -184,6 +209,9 @@ private:
 	int m_iStream_Overworld_Min,m_iStream_Overworld_Max;
 	int m_iStream_Nether_Min,m_iStream_Nether_Max;
 	int m_iStream_End_Min,m_iStream_End_Max;
+    int m_iStream_Creative_Min,m_iStream_Creative_Max;
+    int m_iStream_Menu_Min,m_iStream_Menu_Max;
+    int m_iStream_Battle_Min,m_iStream_Battle_Max;
 	int m_iStream_CD_1;
 	bool *m_bHeardTrackA;
 
