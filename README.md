@@ -3,7 +3,7 @@
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white)](https://discord.gg/ycYvGjWmhu)
 
-This project is based on source code of Minecraft Legacy Console Edition v1.6.0560.0 (TU19) with some fixes and improvements applied.
+This project is based on Legacy Console Edition v1.6.0560.0 (TU19) with fixes and improvements applied.
 
 ![Tutorial World](.github/hardcore-preview.png)
 
