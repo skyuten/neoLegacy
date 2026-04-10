@@ -371,6 +371,19 @@ int main(int argc, char **argv)
 	config.showHelp = false;
 
 	SetConsoleCtrlHandler(ConsoleCtrlHandlerProc, TRUE);
+
+	// Disable QuickEdit mode so clicking in the console window doesn't freeze
+	// the server process. Without this, any accidental click pauses all threads
+	// that write to stdout until a key is pressed.
+	{
+		HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
+		DWORD mode = 0;
+		GetConsoleMode(hInput, &mode);
+		mode &= ~ENABLE_QUICK_EDIT_MODE;
+		mode |= ENABLE_EXTENDED_FLAGS;
+		SetConsoleMode(hInput, mode);
+	}
+
 	SetExeWorkingDirectory();
 
 	// Load base settings from server.properties, then override with CLI values when provided

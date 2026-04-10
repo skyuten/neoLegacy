@@ -205,31 +205,14 @@ void PlayerConnection::disconnect(DisconnectPacket::eDisconnectReason reason)
 	app.DebugPrintf("PlayerConnection disconect reason: %d\n", reason );
 	player->disconnect();
 
-	// 4J Stu - Need to remove the player from the receiving list before their socket is NULLed so that we can find another player on their system
-	server->getPlayers()->removePlayerFromReceiving( player );
-	send(std::make_shared<DisconnectPacket>(reason));
-	connection->sendAndQuit();
-	// 4J-PB - removed, since it needs to be localised in the language the client is in
-	//server->players->broadcastAll( shared_ptr<ChatPacket>( new ChatPacket(L"�e" + player->name + L" left the game.") ) );
-	if (!kickLeaveMessage.empty())
-	{
-		server->getPlayers()->broadcastAll(std::make_shared<ChatPacket>(kickLeaveMessage));
-	}
-	else if (!fourKitHandledQuit)
-	{
-		if(getWasKicked())
-		{
-			server->getPlayers()->broadcastAll(std::make_shared<ChatPacket>(player->name, ChatPacket::e_ChatPlayerKickedFromGame));
-		}
-		else
-		{
-			server->getPlayers()->broadcastAll(std::make_shared<ChatPacket>(player->name, ChatPacket::e_ChatPlayerLeftGame));
-		}
-	}
-
-	server->getPlayers()->remove(player);
+	// Mark done and release the lock BEFORE the heavy PlayerList work.
+	// The actual removal, broadcast, and socket teardown are queued for
+	// the next tick, which processes them without holding done_cs.
 	done = true;
 	LeaveCriticalSection(&done_cs);
+
+	server->getPlayers()->queueDisconnect(player, static_cast<int>(reason),
+		kickLeaveMessage, getWasKicked(), fourKitHandledQuit);
 }
 
 void PlayerConnection::handlePlayerInput(shared_ptr<PlayerInputPacket> packet)
@@ -404,6 +387,7 @@ void PlayerConnection::handleMovePlayer(shared_ptr<MovePlayerPacket> packet)
 #endif
 
 		float r = 1 / 16.0f;
+		if (player->bb == nullptr) return;
 		bool oldOk = level->getCubes(player, player->bb->copy()->shrink(r, r, r))->empty();
 
 		if (player->onGround && !packet->onGround && yDist > 0)
@@ -451,13 +435,19 @@ void PlayerConnection::handleMovePlayer(shared_ptr<MovePlayerPacket> packet)
 		}
 		player->absMoveTo(xt, yt, zt, yRotT, xRotT);
 
-		bool newOk = level->getCubes(player, player->bb->copy()->shrink(r, r, r))->empty();
+		AABB *playerBB = player->bb;
+		if (playerBB == nullptr)
+		{
+			teleport(xLastOk, yLastOk, zLastOk, yRotT, xRotT);
+			return;
+		}
+		bool newOk = level->getCubes(player, playerBB->copy()->shrink(r, r, r))->empty();
 		if (oldOk && (fail || !newOk) && !player->isSleeping())
 		{
 			teleport(xLastOk, yLastOk, zLastOk, yRotT, xRotT);
 			return;
 		}
-		AABB *testBox = player->bb->copy()->grow(r, r, r)->expand(0, -0.55, 0);
+		AABB *testBox = playerBB->copy()->grow(r, r, r)->expand(0, -0.55, 0);
 		// && server.level.getCubes(player, testBox).size() == 0
 		if (!server->isFlightAllowed() && !player->gameMode->isCreative() && !level->containsAnyBlocks(testBox) && !player->isAllowedToFly() )
 		{
@@ -843,23 +833,12 @@ void PlayerConnection::onDisconnect(DisconnectPacket::eDisconnectReason reason, 
 		false);
 	fourKitHandledQuit = FourKitBridge::FirePlayerQuit(player->entityId);
 #endif
-	//    logger.info(player.name + " lost connection: " + reason);
-	// 4J-PB - removed, since it needs to be localised in the language the client is in
-	//server->players->broadcastAll( shared_ptr<ChatPacket>( new ChatPacket(L"�e" + player->name + L" left the game.") ) );
-	if (!fourKitHandledQuit)
-	{
-		if(getWasKicked())
-		{
-			server->getPlayers()->broadcastAll(std::make_shared<ChatPacket>(player->name, ChatPacket::e_ChatPlayerKickedFromGame));
-		}
-		else
-		{
-			server->getPlayers()->broadcastAll(std::make_shared<ChatPacket>(player->name, ChatPacket::e_ChatPlayerLeftGame));
-		}
-	}
-	server->getPlayers()->remove(player);
+
 	done = true;
 	LeaveCriticalSection(&done_cs);
+
+	server->getPlayers()->queueDisconnect(player, static_cast<int>(reason),
+		L"", getWasKicked(), fourKitHandledQuit);
 }
 
 void PlayerConnection::openSecurityGate()

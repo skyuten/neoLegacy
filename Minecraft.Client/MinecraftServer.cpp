@@ -2401,36 +2401,7 @@ void MinecraftServer::chunkPacketManagement_PreTick()
 	s_tickStartTime = System::currentTimeMillis();
 	s_sentTo.clear();
 
-	vector< shared_ptr<PlayerConnection> > *players = connection->getPlayers();
-
-	if( players->size() )
-	{
-		vector< shared_ptr<PlayerConnection> > playersOrig = *players;
-		players->clear();
-
-		do
-		{
-			int longestTime = 0;
-			auto playerConnectionBest = playersOrig.begin();
-			for( auto it = playersOrig.begin(); it != playersOrig.end(); it++)
-			{
-				int thisTime = 0;
-				INetworkPlayer *np = (*it)->getNetworkPlayer();
-				if( np )
-				{
-					thisTime = np->GetTimeSinceLastChunkPacket_ms();
-				}
-
-				if( thisTime > longestTime )
-				{
-					playerConnectionBest = it;
-					longestTime = thisTime;
-				}
-			}
-			players->push_back(*playerConnectionBest);
-			playersOrig.erase(playerConnectionBest);
-		} while ( playersOrig.size() > 0 );
-	}
+	connection->sortPlayersByChunkPriority();
 }
 
 void MinecraftServer::chunkPacketManagement_PostTick()

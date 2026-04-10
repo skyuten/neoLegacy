@@ -23,6 +23,14 @@ This project is based on Legacy Console Edition v1.6.0560.0 (TU19) with fixes an
 
 ## Latest:
 
+### Dedicated Server Stability Fixes
+
+- Fixed crashes caused by concurrent access to the player list during multiplayer. The players vector is now protected by a critical section, and all iterations use copy-on-read snapshots to prevent iterator invalidation when players join or leave mid-tick
+- Fixed a null pointer crash in the movement validation handler when a player's bounding box was accessed during removal
+- Fixed a race condition in network socket writes where a disconnecting player's network reference could become invalid between validation and use
+- Fixed a deadlock in the player disconnect path by replacing inline cleanup with a queued disconnect system that is drained safely on the main tick thread
+- Disabled Windows QuickEdit mode on the server console to prevent the process from freezing until console input is received
+
 ### Beacon Menu Fixes
 
 - Fixed the beacon consuming a payment item (emerald, diamond, iron ingot, or gold ingot) when pressing the submit checkmark without changing any powers

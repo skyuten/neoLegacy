@@ -77,6 +77,8 @@ PlayerList::PlayerList(MinecraftServer *server)
 	int rawMax = server->settings->getInt(L"max-players", 8);
 	maxPlayers = static_cast<unsigned int>(Mth::clamp(rawMax, 1, MINECRAFT_NET_MAX_PLAYERS));
 	doWhiteList = false;
+	InitializeCriticalSection(&m_playersCS);
+	InitializeCriticalSection(&m_disconnectCS);
 	InitializeCriticalSection(&m_banCS);
 	InitializeCriticalSection(&m_kickPlayersCS);
 	InitializeCriticalSection(&m_closePlayersCS);
@@ -91,9 +93,32 @@ PlayerList::~PlayerList()
 		player->gameMode = nullptr;
 	}
 
+	DeleteCriticalSection(&m_playersCS);
+	DeleteCriticalSection(&m_disconnectCS);
 	DeleteCriticalSection(&m_banCS);
 	DeleteCriticalSection(&m_kickPlayersCS);
 	DeleteCriticalSection(&m_closePlayersCS);
+}
+
+vector<shared_ptr<ServerPlayer> > PlayerList::getPlayersSnapshot()
+{
+	EnterCriticalSection(&m_playersCS);
+	vector<shared_ptr<ServerPlayer> > snapshot = players;
+	LeaveCriticalSection(&m_playersCS);
+	return snapshot;
+}
+
+void PlayerList::queueDisconnect(shared_ptr<ServerPlayer> player, int reason, const wstring& kickMessage, bool wasKicked, bool fourKitHandledQuit)
+{
+	PendingDisconnect pd;
+	pd.player = player;
+	pd.reason = reason;
+	pd.kickMessage = kickMessage;
+	pd.wasKicked = wasKicked;
+	pd.fourKitHandledQuit = fourKitHandledQuit;
+	EnterCriticalSection(&m_disconnectCS);
+	m_pendingDisconnects.push_back(pd);
+	LeaveCriticalSection(&m_disconnectCS);
 }
 
 bool PlayerList::placeNewPlayer(Connection *connection, shared_ptr<ServerPlayer> player, shared_ptr<LoginPacket> packet)
@@ -531,7 +556,9 @@ void PlayerList::add(shared_ptr<ServerPlayer> player)
 		broadcastAll(std::make_shared<PlayerInfoPacket>(player));
 	}
 
+	EnterCriticalSection(&m_playersCS);
 	players.push_back(player);
+	LeaveCriticalSection(&m_playersCS);
 
 	// 4J Added
 	addPlayerToReceiving(player);
@@ -548,13 +575,16 @@ void PlayerList::add(shared_ptr<ServerPlayer> player)
 	changeDimension(player, nullptr);
 	level->addEntity(player);
 
-	for (size_t i = 0; i < players.size(); i++)
 	{
-		shared_ptr<ServerPlayer> op = players.at(i);
-		//player->connection->send(shared_ptr<PlayerInfoPacket>( new PlayerInfoPacket(op->name, true, op->latency) ) );
-		if( op->connection->getNetworkPlayer() )
+		vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
+		for (size_t i = 0; i < snapshot.size(); i++)
 		{
-			player->connection->send(std::make_shared<PlayerInfoPacket>(op));
+			shared_ptr<ServerPlayer> op = snapshot.at(i);
+			//player->connection->send(shared_ptr<PlayerInfoPacket>( new PlayerInfoPacket(op->name, true, op->latency) ) );
+			if( op->connection->getNetworkPlayer() )
+			{
+				player->connection->send(std::make_shared<PlayerInfoPacket>(op));
+			}
 		}
 	}
 
@@ -580,9 +610,10 @@ void PlayerList::add(shared_ptr<ServerPlayer> player)
 		broadcastAll(std::make_shared<AddPlayerPacket>(player, xuid, onlineXuid, xp, yp, zp, yRotp, xRotp, yHeadRotp));
 
 		// Send all existing players to the new player
-		for (size_t i = 0; i < players.size(); i++)
+		vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
+		for (size_t i = 0; i < snapshot.size(); i++)
 		{
-			shared_ptr<ServerPlayer> op = players.at(i);
+			shared_ptr<ServerPlayer> op = snapshot.at(i);
 			if (op != player && op->connection->getNetworkPlayer())
 			{
 				PlayerUID opXuid = INVALID_XUID;
@@ -605,9 +636,10 @@ void PlayerList::add(shared_ptr<ServerPlayer> player)
 	if(level->isAtLeastOnePlayerSleeping())
 	{
 		shared_ptr<ServerPlayer> firstSleepingPlayer = nullptr;
-		for (unsigned int i = 0; i < players.size(); i++)
+		vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
+		for (unsigned int i = 0; i < snapshot.size(); i++)
 		{
-			shared_ptr<ServerPlayer> thisPlayer = players[i];
+			shared_ptr<ServerPlayer> thisPlayer = snapshot[i];
 			if(thisPlayer->isSleeping())
 			{
 				if(firstSleepingPlayer == nullptr) firstSleepingPlayer = thisPlayer;
@@ -655,11 +687,13 @@ if (player->riding != nullptr)
 	level->getTracker()->removeEntity(player);
 	level->removeEntity(player);
 	level->getChunkMap()->remove(player);
+	EnterCriticalSection(&m_playersCS);
     auto it = find(players.begin(), players.end(), player);
     if( it != players.end() )
 	{
 		players.erase(it);
 	}
+	LeaveCriticalSection(&m_playersCS);
 	// Notify fork clients that this player has left the server so they can
 	// clean up IQNet/Tab list entries.  Uses a custom payload channel so the
 	// wire format of existing packets is unchanged (upstream clients simply
@@ -781,11 +815,13 @@ shared_ptr<ServerPlayer> PlayerList::respawn(shared_ptr<ServerPlayer> serverPlay
 	}
 
 	serverPlayer->getLevel()->getChunkMap()->remove(serverPlayer);
+	EnterCriticalSection(&m_playersCS);
     auto it = find(players.begin(), players.end(), serverPlayer);
     if( it != players.end() )
 	{
 		players.erase(it);
 	}
+	LeaveCriticalSection(&m_playersCS);
 	server->getLevel(serverPlayer->dimension)->removeEntityImmediately(serverPlayer);
 
 	Pos *bedPosition = serverPlayer->getRespawnPosition();
@@ -899,7 +935,9 @@ shared_ptr<ServerPlayer> PlayerList::respawn(shared_ptr<ServerPlayer> serverPlay
 
 	level->getChunkMap()->add(player);
 	level->addEntity(player);
+	EnterCriticalSection(&m_playersCS);
 	players.push_back(player);
+	LeaveCriticalSection(&m_playersCS);
 
 	player->initMenu();
 	player->setHealth(player->getHealth());
@@ -1135,10 +1173,11 @@ void PlayerList::tick()
 		}
 
 		// Report cipher completion and open security gate for all completed handshakes
+		vector<shared_ptr<ServerPlayer> > tickSnapshot = getPlayersSnapshot();
 		for (unsigned char smallId : completed)
 		{
 			// Open the security gate -- flush buffered game packets now that cipher is active
-			for (auto &p : players)
+			for (auto &p : tickSnapshot)
 			{
 				if (p == nullptr || p->connection == nullptr) continue;
 				INetworkPlayer *np = p->connection->getNetworkPlayer();
@@ -1168,7 +1207,7 @@ void PlayerList::tick()
 			for (unsigned char smallId : completed)
 			{
 				// Find the player by smallId
-				for (auto &p : players)
+				for (auto &p : tickSnapshot)
 				{
 					if (p == nullptr || p->connection == nullptr) continue;
 					INetworkPlayer *np = p->connection->getNetworkPlayer();
@@ -1212,7 +1251,7 @@ void PlayerList::tick()
 			}
 
 			// Enforce identity token response timeout
-			for (auto &p : players)
+			for (auto &p : tickSnapshot)
 			{
 				if (p == nullptr || p->connection == nullptr) continue;
 				int challengeTick = p->connection->getIdentityChallengeTick();
@@ -1244,27 +1283,78 @@ void PlayerList::tick()
 		sendAllPlayerInfoIn = 0;
 	}
 
-	if (sendAllPlayerInfoIn < players.size())
 	{
-		shared_ptr<ServerPlayer> op = players[sendAllPlayerInfoIn];
+	vector<shared_ptr<ServerPlayer> > infoSnapshot = getPlayersSnapshot();
+	if (sendAllPlayerInfoIn < infoSnapshot.size())
+	{
+		shared_ptr<ServerPlayer> op = infoSnapshot[sendAllPlayerInfoIn];
 		//broadcastAll(shared_ptr<PlayerInfoPacket>( new PlayerInfoPacket(op->name, true, op->latency) ) );
 		if( op->connection->getNetworkPlayer() )
 		{
 			broadcastAll(std::make_shared<PlayerInfoPacket>(op));
 		}
 	}
+	}
 
-	EnterCriticalSection(&m_closePlayersCS);
-	while(!m_smallIdsToClose.empty())
+	// Drain the pending disconnect queue. disconnect() enqueues here so it
+	// can release done_cs before the heavy cleanup runs on the tick thread.
 	{
-		BYTE smallId = m_smallIdsToClose.front();
-		m_smallIdsToClose.pop_front();
+		std::deque<PendingDisconnect> dcCopy;
+		EnterCriticalSection(&m_disconnectCS);
+		dcCopy.swap(m_pendingDisconnects);
+		LeaveCriticalSection(&m_disconnectCS);
+
+		while (!dcCopy.empty())
+		{
+			PendingDisconnect pd = dcCopy.front();
+			dcCopy.pop_front();
+
+			server->getPlayers()->removePlayerFromReceiving(pd.player);
+			if (pd.player->connection != nullptr)
+			{
+				pd.player->connection->send(std::make_shared<DisconnectPacket>(static_cast<DisconnectPacket::eDisconnectReason>(pd.reason)));
+				pd.player->connection->connection->sendAndQuit();
+			}
+
+			if (!pd.kickMessage.empty())
+			{
+				broadcastAll(std::make_shared<ChatPacket>(pd.kickMessage));
+			}
+			else if (!pd.fourKitHandledQuit)
+			{
+				if (pd.wasKicked)
+				{
+					broadcastAll(std::make_shared<ChatPacket>(pd.player->name, ChatPacket::e_ChatPlayerKickedFromGame));
+				}
+				else
+				{
+					broadcastAll(std::make_shared<ChatPacket>(pd.player->name, ChatPacket::e_ChatPlayerLeftGame));
+				}
+			}
+
+			remove(pd.player);
+		}
+	}
+
+	// Drain the close queue: snapshot the deque, then release the CS before
+	// calling disconnect() which may itself try to acquire other locks.
+	std::deque<BYTE> closeCopy;
+	EnterCriticalSection(&m_closePlayersCS);
+	closeCopy.swap(m_smallIdsToClose);
+	LeaveCriticalSection(&m_closePlayersCS);
+
+	{
+	vector<shared_ptr<ServerPlayer> > closeSnapshot = getPlayersSnapshot();
+	while(!closeCopy.empty())
+	{
+		BYTE smallId = closeCopy.front();
+		closeCopy.pop_front();
 
 		shared_ptr<ServerPlayer> player = nullptr;
 
-		for(unsigned int i = 0; i < players.size(); i++)
+		for(unsigned int i = 0; i < closeSnapshot.size(); i++)
 		{
-			shared_ptr<ServerPlayer> p = players.at(i);
+			shared_ptr<ServerPlayer> p = closeSnapshot.at(i);
 			// 4J Stu - May be being a bit overprotective with all the nullptr checks, but adding late in TU7 so want to be safe
 			if (p != nullptr && p->connection != nullptr && p->connection->connection != nullptr && p->connection->connection->getSocket() != nullptr && p->connection->connection->getSocket()->getSmallId() == smallId )
 			{
@@ -1286,13 +1376,19 @@ void PlayerList::tick()
 		WinsockNetLayer::ClearSocketForSmallId(smallId);
 #endif
 	}
-	LeaveCriticalSection(&m_closePlayersCS);
+	}
 
+	std::deque<BYTE> kickCopy;
 	EnterCriticalSection(&m_kickPlayersCS);
-	while(!m_smallIdsToKick.empty())
+	kickCopy.swap(m_smallIdsToKick);
+	LeaveCriticalSection(&m_kickPlayersCS);
+
 	{
-		BYTE smallId = m_smallIdsToKick.front();
-		m_smallIdsToKick.pop_front();
+	vector<shared_ptr<ServerPlayer> > kickSnapshot = getPlayersSnapshot();
+	while(!kickCopy.empty())
+	{
+		BYTE smallId = kickCopy.front();
+		kickCopy.pop_front();
 		INetworkPlayer *selectedPlayer = g_NetworkManager.GetPlayerBySmallId(smallId);
 		if( selectedPlayer != nullptr )
 		{
@@ -1303,9 +1399,9 @@ void PlayerList::tick()
 				// Kick this player from the game
 				shared_ptr<ServerPlayer> player = nullptr;
 
-				for(unsigned int i = 0; i < players.size(); i++)
+				for(unsigned int i = 0; i < kickSnapshot.size(); i++)
 				{
-					shared_ptr<ServerPlayer> p = players.at(i);
+					shared_ptr<ServerPlayer> p = kickSnapshot.at(i);
 					PlayerUID playersXuid = p->getOnlineXuid();
 					if (p != nullptr && ProfileManager.AreXUIDSEqual(playersXuid, xuid ) )
 					{
@@ -1326,7 +1422,7 @@ void PlayerList::tick()
 			}
 		}
 	}
-	LeaveCriticalSection(&m_kickPlayersCS);
+	}
 
 	// Check our receiving players, and if they are dead see if we can replace them
 	for(unsigned int dim = 0; dim < 2; ++dim)
@@ -1360,29 +1456,32 @@ void PlayerList::prioritiseTileChanges(int x, int y, int z, int dimension)
 
 void PlayerList::broadcastAll(shared_ptr<Packet> packet)
 {
-	for (unsigned int i = 0; i < players.size(); i++)
+	vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
+	for (unsigned int i = 0; i < snapshot.size(); i++)
 	{
-		shared_ptr<ServerPlayer> player = players[i];
+		shared_ptr<ServerPlayer> player = snapshot[i];
 		player->connection->send(packet);
 	}
 }
 
 void PlayerList::broadcastAll(shared_ptr<Packet> packet, int dimension)
 {
-	for (unsigned int i = 0; i < players.size(); i++)
+	vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
+	for (unsigned int i = 0; i < snapshot.size(); i++)
 	{
-		shared_ptr<ServerPlayer> player = players[i];
+		shared_ptr<ServerPlayer> player = snapshot[i];
 		if (player->dimension == dimension) player->connection->send(packet);
 	}
 }
 
 wstring PlayerList::getPlayerNames()
 {
+	vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
 	wstring msg;
-	for (unsigned int i = 0; i < players.size(); i++)
+	for (unsigned int i = 0; i < snapshot.size(); i++)
 	{
 		if (i > 0) msg += L", ";
-		msg += players[i]->name;
+		msg += snapshot[i]->name;
 	}
 	return msg;
 }
@@ -1410,9 +1509,10 @@ bool PlayerList::isOp(shared_ptr<ServerPlayer> player)
 
 shared_ptr<ServerPlayer> PlayerList::getPlayer(const wstring& name)
 {
-	for (unsigned int i = 0; i < players.size(); i++)
+	vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
+	for (unsigned int i = 0; i < snapshot.size(); i++)
 	{
-		shared_ptr<ServerPlayer> p = players[i];
+		shared_ptr<ServerPlayer> p = snapshot[i];
 		if (p->name == name)	// 4J - used to be case insensitive (using equalsIgnoreCase) - imagine we'll be shifting to XUIDs anyway
 		{
 			return p;
@@ -1424,9 +1524,10 @@ shared_ptr<ServerPlayer> PlayerList::getPlayer(const wstring& name)
 // 4J Added
 shared_ptr<ServerPlayer> PlayerList::getPlayer(PlayerUID uid)
 {
-	for (unsigned int i = 0; i < players.size(); i++)
+	vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
+	for (unsigned int i = 0; i < snapshot.size(); i++)
 	{
-		shared_ptr<ServerPlayer> p = players[i];
+		shared_ptr<ServerPlayer> p = snapshot[i];
 		if (p->getXuid() == uid || p->getOnlineXuid() == uid)	// 4J - used to be case insensitive (using equalsIgnoreCase) - imagine we'll be shifting to XUIDs anyway
 		{
 			return p;
@@ -1437,15 +1538,16 @@ shared_ptr<ServerPlayer> PlayerList::getPlayer(PlayerUID uid)
 
 shared_ptr<ServerPlayer> PlayerList::getNearestPlayer(Pos *position, int range)
 {
-	if (players.empty()) return nullptr;
-	if (position == nullptr) return players.at(0);
+	vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
+	if (snapshot.empty()) return nullptr;
+	if (position == nullptr) return snapshot.at(0);
 	shared_ptr<ServerPlayer> current = nullptr;
 	double dist = -1;
 	int rangeSqr = range * range;
 
-	for (size_t i = 0; i < players.size(); i++)
+	for (size_t i = 0; i < snapshot.size(); i++)
 	{
-		shared_ptr<ServerPlayer> next = players.at(i);
+		shared_ptr<ServerPlayer> next = snapshot.at(i);
 		double newDist = position->distSqr(next->getCommandSenderWorldPosition());
 
 		if ((dist == -1 || newDist < dist) && (range <= 0 || newDist <= rangeSqr))
@@ -1566,9 +1668,10 @@ void PlayerList::broadcast(shared_ptr<Player> except, double x, double y, double
 		sentTo.push_back(dynamic_pointer_cast<ServerPlayer>(except));
 	}
 
-	for (unsigned int i = 0; i < players.size(); i++)
+	vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
+	for (unsigned int i = 0; i < snapshot.size(); i++)
 	{
-		shared_ptr<ServerPlayer> p = players[i];
+		shared_ptr<ServerPlayer> p = snapshot[i];
 		if (p == except) continue;
 		if (p->dimension != dimension) continue;
 
@@ -1630,14 +1733,15 @@ void PlayerList::saveAll(ProgressListener *progressListener, bool bDeleteGuestMa
 	if(playerIo)
 	{
 		playerIo->saveAllCachedData();
-		for (unsigned int i = 0; i < players.size(); i++)
+		vector<shared_ptr<ServerPlayer> > snapshot = getPlayersSnapshot();
+		for (unsigned int i = 0; i < snapshot.size(); i++)
 		{
-			playerIo->save(players[i]);
+			playerIo->save(snapshot[i]);
 
 			//4J Stu - We don't want to save the map data for guests, so when we are sure that the player is gone delete the map
-			if(bDeleteGuestMaps && players[i]->isGuest()) playerIo->deleteMapFilesForPlayer(players[i]);
+			if(bDeleteGuestMaps && snapshot[i]->isGuest()) playerIo->deleteMapFilesForPlayer(snapshot[i]);
 
-			if(progressListener != nullptr) progressListener->progressStagePercentage((i * 100)/ static_cast<int>(players.size()));
+			if(progressListener != nullptr) progressListener->progressStagePercentage((i * 100)/ static_cast<int>(snapshot.size()));
 		}
 		playerIo->clearOldPlayerFiles();
 		playerIo->saveMapIdLookup();
@@ -1794,9 +1898,15 @@ void PlayerList::removePlayerFromReceiving(shared_ptr<ServerPlayer> player, bool
 	}
 
 	INetworkPlayer *thisPlayer = player->connection->getNetworkPlayer();
+
+	// Snapshot the players vector to avoid iterator invalidation during concurrent modifications
+	EnterCriticalSection(&m_playersCS);
+	vector<shared_ptr<ServerPlayer> > playersSnapshot = players;
+	LeaveCriticalSection(&m_playersCS);
+
 	if( thisPlayer && playerRemoved )
 	{
-		for(auto& newPlayer : players)
+		for(auto& newPlayer : playersSnapshot)
 		{
 			INetworkPlayer *otherPlayer = newPlayer->connection->getNetworkPlayer();
 
@@ -1821,7 +1931,7 @@ void PlayerList::removePlayerFromReceiving(shared_ptr<ServerPlayer> player, bool
 #endif
 		// 4J Stu - Something went wrong, or possibly the QNet player left before we got here.
 		// Re-check all active players and make sure they have someone on their system to receive all packets
-		for(auto& newPlayer : players)
+		for(auto& newPlayer : playersSnapshot)
 		{
 			INetworkPlayer *checkingPlayer = newPlayer->connection->getNetworkPlayer();
 
