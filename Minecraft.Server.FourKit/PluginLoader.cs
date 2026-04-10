@@ -10,11 +10,16 @@ internal sealed class PluginLoader
         BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
 
     private readonly List<ServerPlugin> _plugins = new();
+    private string _serverRoot = string.Empty;
+    private string _pluginsDirectory = string.Empty;
 
     public IReadOnlyList<ServerPlugin> Plugins => _plugins.AsReadOnly();
 
-    public void LoadPlugins(string pluginsDirectory)
+    public void LoadPlugins(string pluginsDirectory, string serverRoot)
     {
+        _serverRoot = serverRoot;
+        _pluginsDirectory = pluginsDirectory;
+
         if (!Directory.Exists(pluginsDirectory))
         {
             ServerLog.Info("fourkit", $"Creating plugins directory: {pluginsDirectory}");
@@ -136,8 +141,15 @@ internal sealed class PluginLoader
     {
         try
         {
-            InvokePluginMethod(plugin, "onEnable", "OnEnable");
             string pName = GetPluginString(plugin, "name", "getName", "GetName", plugin.GetType().Name);
+
+            plugin.serverDirectory = _serverRoot;
+            string dataDir = Path.Combine(_pluginsDirectory, pName);
+            if (!Directory.Exists(dataDir))
+                Directory.CreateDirectory(dataDir);
+            plugin.dataDirectory = dataDir;
+
+            InvokePluginMethod(plugin, "onEnable", "OnEnable");
             ServerLog.Info("fourkit", $"Enabled: {pName}");
 
             FourKit.FireEvent(new PluginEnableEvent(plugin));

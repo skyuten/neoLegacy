@@ -25,9 +25,15 @@ public static partial class FourKitHost
             // host exe's directory instead so end users see a top-level plugins/.
             string hostExePath = Environment.ProcessPath ?? AppContext.BaseDirectory;
             string serverRoot = Path.GetDirectoryName(hostExePath) ?? AppContext.BaseDirectory;
+
+            // Redirect AppContext.BaseDirectory to the server root so that
+            // plugins using AppContext.BaseDirectory get the exe directory
+            // instead of the runtime/ subfolder.
+            AppContext.SetData("APP_CONTEXT_BASE_DIRECTORY", serverRoot + Path.DirectorySeparatorChar);
+
             string pluginsDir = Path.Combine(serverRoot, "plugins");
             s_loader = new PluginLoader();
-            s_loader.LoadPlugins(pluginsDir);
+            s_loader.LoadPlugins(pluginsDir, serverRoot);
             s_loader.EnableAll();
 
             ServerLog.Info("fourkit", "Plugin system ready.");
