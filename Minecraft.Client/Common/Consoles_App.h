@@ -22,7 +22,7 @@ using namespace std;
 #include "./GameRules/GameRuleManager.h"
 #include "../SkinBox.h"
 #include "../ArchiveFile.h"
-#include "../FolderFile.h"
+#include "lce_filesystem/FolderFile.h"
 
 typedef struct _JoinFromInviteData
 {

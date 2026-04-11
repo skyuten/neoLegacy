@@ -278,8 +278,6 @@ source_group("Common/UI" FILES ${_MINECRAFT_CLIENT_COMMON_COMMON_UI})
 set(_MINECRAFT_CLIENT_COMMON_COMMON_UI_ALL_PLATFORMS
   "${CMAKE_CURRENT_SOURCE_DIR}/ArchiveFile.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/ArchiveFile.h" 
-  "${CMAKE_CURRENT_SOURCE_DIR}/FolderFile.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/FolderFile.h"
   "${BASE_DIR}/UI/IUIController.h"
   "${BASE_DIR}/UI/IUIScene_AbstractContainerMenu.cpp"
   "${BASE_DIR}/UI/IUIScene_AbstractContainerMenu.h"
