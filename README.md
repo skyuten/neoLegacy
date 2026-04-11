@@ -28,6 +28,21 @@ This project is based on Legacy Console Edition v1.6.0560.0 (TU19) with fixes an
 
 ## Latest:
 
+### Join Flow Kick Fix
+
+- Fixed newly whitelisted players being insta-kicked on their first connection attempt, then kicked again around 20 seconds into their second attempt. Two separate bugs were colliding: a stale cancel flag left over from the earlier "not whitelisted" rejection screen, and an orphaned login session on the server that would fire a late disconnect packet into a recycled player slot once its 30-second login timer expired
+
+### Fullscreen and Frame Rate Fixes
+
+- Fullscreen (Alt+Enter / F11) now enters true DXGI exclusive fullscreen instead of borderless. With VSync off, your frame rate is actually uncapped and delivered straight to the display, which means noticeably lower input latency on high-refresh monitors
+- The game now renders at your monitor's native resolution with no driver-side scaling, removing the soft / grey filter look that borderless mode produced
+- Fixed a black-screen regression on secured dedicated servers, where the new swap chain configuration conflicted with the 4J render library's deferred context
+- Fixed aspect ratio scaling so non-16:9 window sizes draw the world correctly again
+
+### Controller Cursor Speed
+
+- Fixed controller cursor speed scaling with frame rate. Your cursor now moves at the same speed whether you're at 60fps or 500fps, instead of becoming unusably fast at high frame rates
+
 ### Dedicated Server Stability Fixes
 
 - Fixed crashes caused by concurrent access to the player list during multiplayer. The players vector is now protected by a critical section, and all iterations use copy-on-read snapshots to prevent iterator invalidation when players join or leave mid-tick
