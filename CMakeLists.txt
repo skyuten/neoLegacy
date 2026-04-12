@@ -13,12 +13,24 @@ if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
   message(FATAL_ERROR "Use a 64-bit generator/toolchain (x64).")
 endif()
 
+set(LCE_XWIN_CROSS_DEBUG_COMPAT OFF)
+if(CMAKE_CROSSCOMPILING AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(LCE_XWIN_CROSS_DEBUG_COMPAT ON)
+endif()
+
 set(CMAKE_CONFIGURATION_TYPES
   "Debug"
   "Release"
   CACHE STRING "" FORCE
 )
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+if(NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
+  if(CMAKE_CROSSCOMPILING AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
+  else()
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  endif()
+endif()
 
 function(configure_compiler_target target)
   # MSVC and compatible compilers (like Clang-cl)
@@ -31,8 +43,12 @@ function(configure_compiler_target target)
       $<$<COMPILE_LANGUAGE:C,CXX>:/GS>
       $<$<COMPILE_LANGUAGE:CXX>:/EHsc>
       $<$<COMPILE_LANGUAGE:CXX>:/GR>
+      $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:C,CXX>>:/Z7>
       $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:C,CXX>>:/Od>
       $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:C,CXX>>:/O2 /Oi /GT /GF>
+    )
+    target_link_options(${target} PRIVATE
+      $<$<CONFIG:Debug>:/DEBUG:FULL /INCREMENTAL:NO>
     )
   endif()
 
@@ -65,7 +81,9 @@ endfunction()
 set(MINECRAFT_SHARED_DEFINES
   _LARGE_WORLDS
   _DEBUG_MENUS_ENABLED
-  $<$<CONFIG:Debug>:_DEBUG>
+  $<$<AND:$<CONFIG:Debug>,$<NOT:$<BOOL:${LCE_XWIN_CROSS_DEBUG_COMPAT}>>>:_DEBUG>
+  $<$<AND:$<CONFIG:Debug>,$<BOOL:${LCE_XWIN_CROSS_DEBUG_COMPAT}>>:_ITERATOR_DEBUG_LEVEL=0>
+  $<$<AND:$<CONFIG:Debug>,$<BOOL:${LCE_XWIN_CROSS_DEBUG_COMPAT}>>:_HAS_ITERATOR_DEBUGGING=0>
   _CRT_NON_CONFORMING_SWPRINTFS
   _CRT_SECURE_NO_WARNINGS
   _HAS_STD_BYTE=0

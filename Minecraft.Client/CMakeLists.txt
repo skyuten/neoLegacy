@@ -70,30 +70,50 @@ set_source_files_properties(compat_shims.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS 
 
 configure_compiler_target(Minecraft.Client)
 
+set(MINECRAFT_CLIENT_USE_4J_DEBUG_LIBS TRUE)
+if(CMAKE_CROSSCOMPILING AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(MINECRAFT_CLIENT_USE_4J_DEBUG_LIBS FALSE)
+endif()
+
 set_target_properties(Minecraft.Client PROPERTIES
   OUTPUT_NAME "Minecraft.Client"
   VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:Minecraft.Client>"
 )
 
-target_link_libraries(Minecraft.Client PRIVATE
-  Minecraft.World
-  d3d11
-  dxgi
-  d3dcompiler
-  XInput9_1_0
-  wsock32
-  legacy_stdio_definitions
-  $<$<CONFIG:Debug>: # Debug 4J libraries
-    "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Input_d.lib"
-    "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Storage_d.lib"
-    "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Render_PC_d.lib"
-  >
-  $<$<NOT:$<CONFIG:Debug>>: # Release 4J libraries
+if(MINECRAFT_CLIENT_USE_4J_DEBUG_LIBS)
+  target_link_libraries(Minecraft.Client PRIVATE
+    Minecraft.World
+    d3d11
+    dxgi
+    d3dcompiler
+    XInput9_1_0
+    wsock32
+    legacy_stdio_definitions
+    $<$<CONFIG:Debug>:
+      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Input_d.lib"
+      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Storage_d.lib"
+      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Render_PC_d.lib"
+    >
+    $<$<NOT:$<CONFIG:Debug>>:
+      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Input.lib"
+      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Storage.lib"
+      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Render_PC.lib"
+    >
+  )
+else()
+  target_link_libraries(Minecraft.Client PRIVATE
+    Minecraft.World
+    d3d11
+    dxgi
+    d3dcompiler
+    XInput9_1_0
+    wsock32
+    legacy_stdio_definitions
     "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Input.lib"
     "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Storage.lib"
     "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Render_PC.lib"
-  >
-)
+  )
+endif()
 
 # Iggy libs
 foreach(lib IN LISTS IGGY_LIBS)

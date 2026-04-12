@@ -133,11 +133,11 @@ do_install() {
         [[ -e "$BUILD_DIR/Minecraft.Client/$asset" ]] && \
             cp -r "$BUILD_DIR/Minecraft.Client/$asset" "$INSTALL_DIR/client/" || true
     done
-    for asset in iggy_w64.dll Common Windows64; do
-        [[ -e "$BUILD_DIR/Minecraft.Server/$asset" ]] && \
-            cp -r "$BUILD_DIR/Minecraft.Server/$asset" "$INSTALL_DIR/server/" || true
+    for asset in iggy_w64.dll Common Windows64 Windows64Media; do
+        [[ -e "$BUILD_DIR/Minecraft.Server/$BUILD_TYPE/$asset" ]] && \
+            cp -r "$BUILD_DIR/Minecraft.Server/$BUILD_TYPE/$asset" "$INSTALL_DIR/server/" || true
     done
-    for asset in iggy_w64.dll Common Windows64 plugins runtime; do
+    for asset in iggy_w64.dll Common Windows64 Windows64Media plugins runtime; do
         [[ -e "$BUILD_DIR/Minecraft.Server.FourKit/$BUILD_TYPE/$asset" ]] && \
             cp -r "$BUILD_DIR/Minecraft.Server.FourKit/$BUILD_TYPE/$asset" "$INSTALL_DIR/fourkit/" || true
     done
@@ -186,7 +186,8 @@ SERVER_BIND_IP="\${MC_BIND:-0.0.0.0}"
 PERSIST_DIR="\${MC_DATA_DIR:-\$HOME/.local/share/minecraft-lce-server}"
 export WINEARCH=win64
 export WINEPREFIX="\${WINEPREFIX:-\$HOME/.local/share/minecraft-lce-server-prefix}"
-export WINEDLLOVERRIDES="winemenubuilder.exe=d"
+export WINEDLLOVERRIDES="winemenubuilder.exe=d;winedbg.exe=d"
+export WINEDEBUG="-all"
 export WINEESYNC=1
 export WINEFSYNC=1
 mkdir -p "\$PERSIST_DIR" "\$WINEPREFIX"
@@ -211,7 +212,8 @@ if [[ -z "\${DISPLAY:-}" ]]; then
     trap 'kill \$XVFB_PID 2>/dev/null || true; rm -rf "\$WORK_DIR"' EXIT
     sleep 1
 fi
-exec wine "\$WORK_DIR/Minecraft.Server.exe" -port "\$SERVER_PORT" -bind "\$SERVER_BIND_IP" "\$@"
+exec wine "\$WORK_DIR/Minecraft.Server.exe" -port "\$SERVER_PORT" -bind "\$SERVER_BIND_IP" "\$@" \
+    2> >(grep --line-buffered -vE '^(wine:|[0-9A-Fa-f]{4}:(fixme|err|warn|trace):|Unhandled exception:|Backtrace:|Modules:|Threads:|Registers:|Stack dump:)' >&2)
 LAUNCHER
     chmod +x "$INSTALL_DIR/minecraft-lce-server"
 }
@@ -227,7 +229,8 @@ SERVER_BIND_IP="\${MC_BIND:-0.0.0.0}"
 PERSIST_DIR="\${MC_DATA_DIR:-\$HOME/.local/share/minecraft-lce-fourkit}"
 export WINEARCH=win64
 export WINEPREFIX="\${WINEPREFIX:-\$HOME/.local/share/minecraft-lce-fourkit-prefix}"
-export WINEDLLOVERRIDES="winemenubuilder.exe=d"
+export WINEDLLOVERRIDES="winemenubuilder.exe=d;winedbg.exe=d"
+export WINEDEBUG="-all"
 export WINEESYNC=1
 export WINEFSYNC=1
 mkdir -p "\$PERSIST_DIR" "\$WINEPREFIX"
@@ -250,7 +253,8 @@ if [[ -z "\${DISPLAY:-}" ]]; then
     trap 'kill \$XVFB_PID 2>/dev/null || true; rm -rf "\$WORK_DIR"' EXIT
     sleep 1
 fi
-exec wine "\$WORK_DIR/Minecraft.Server.exe" -port "\$SERVER_PORT" -bind "\$SERVER_BIND_IP" "\$@"
+exec wine "\$WORK_DIR/Minecraft.Server.exe" -port "\$SERVER_PORT" -bind "\$SERVER_BIND_IP" "\$@" \
+    2> >(grep --line-buffered -vE '^(wine:|[0-9A-Fa-f]{4}:(fixme|err|warn|trace):|Unhandled exception:|Backtrace:|Modules:|Threads:|Registers:|Stack dump:)' >&2)
 LAUNCHER
     chmod +x "$INSTALL_DIR/minecraft-lce-fourkit"
 }

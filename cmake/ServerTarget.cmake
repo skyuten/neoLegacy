@@ -39,6 +39,11 @@ function(configure_lce_server_target target)
     "${CMAKE_SOURCE_DIR}/Minecraft.Client/Common/Media/MediaWindows64" "Common/Media/MediaWindows64"
   )
 
+  set(_use_debug_4j_libs TRUE)
+  if(CMAKE_CROSSCOMPILING AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(_use_debug_4j_libs FALSE)
+  endif()
+
   target_include_directories(${target} PRIVATE
     "${CMAKE_BINARY_DIR}/generated/" # Generated BuildVer.h
     "${CMAKE_SOURCE_DIR}/Minecraft.Client/"
@@ -70,25 +75,40 @@ function(configure_lce_server_target target)
     VS_DEBUGGER_COMMAND_ARGUMENTS "-port 25565 -bind 0.0.0.0 -name DedicatedServer"
   )
 
-  target_link_libraries(${target} PRIVATE
-    Minecraft.World
-    d3d11
-    dxgi
-    d3dcompiler
-    XInput9_1_0
-    wsock32
-    legacy_stdio_definitions
-    $<$<CONFIG:Debug>:
-      "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Input_d.lib"
-      "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Storage_d.lib"
-      "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Render_PC_d.lib"
-    >
-    $<$<NOT:$<CONFIG:Debug>>:
+  if(_use_debug_4j_libs)
+    target_link_libraries(${target} PRIVATE
+      Minecraft.World
+      d3d11
+      dxgi
+      d3dcompiler
+      XInput9_1_0
+      wsock32
+      legacy_stdio_definitions
+      $<$<CONFIG:Debug>:
+        "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Input_d.lib"
+        "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Storage_d.lib"
+        "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Render_PC_d.lib"
+      >
+      $<$<NOT:$<CONFIG:Debug>>:
+        "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Input.lib"
+        "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Storage.lib"
+        "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Render_PC.lib"
+      >
+    )
+  else()
+    target_link_libraries(${target} PRIVATE
+      Minecraft.World
+      d3d11
+      dxgi
+      d3dcompiler
+      XInput9_1_0
+      wsock32
+      legacy_stdio_definitions
       "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Input.lib"
       "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Storage.lib"
       "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/4JLibs/libs/4J_Render_PC.lib"
-    >
-  )
+    )
+  endif()
 
   foreach(lib IN LISTS IGGY_LIBS)
     target_link_libraries(${target} PRIVATE "${CMAKE_SOURCE_DIR}/Minecraft.Client/${PLATFORM_NAME}/Iggy/lib/${lib}")
@@ -99,6 +119,20 @@ function(configure_lce_server_target target)
   # server flavour has its own set in the VS Solution Explorer.
   setup_asset_folder_copy(${target} "${_asset_folder_pairs}")
   setup_asset_file_copy(${target} "${_asset_files_pairs}")
+
+  if(PLATFORM_NAME STREQUAL "Windows64")
+    add_custom_target(AssetLocalizationCopy_${target} ALL
+      COMMAND ${CMAKE_COMMAND}
+        "-DCOPY_SOURCE=${CMAKE_SOURCE_DIR}/Minecraft.Client/Windows64Media/loc"
+        "-DCOPY_DEST=$<TARGET_FILE_DIR:${target}>/Windows64Media/loc"
+        -P "${CMAKE_SOURCE_DIR}/cmake/CopyFolderScript.cmake"
+      VERBATIM
+    )
+
+    add_dependencies(${target} AssetLocalizationCopy_${target})
+    set_property(TARGET AssetLocalizationCopy_${target} PROPERTY FOLDER "Build")
+  endif()
+
   add_copyredist_target(${target})
   if(PLATFORM_NAME STREQUAL "Windows64")
     add_gamehdd_target(${target})
