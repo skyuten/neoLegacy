@@ -381,44 +381,43 @@ std::vector<OceanMonumentPieces::RoomDefinition*> OceanMonumentPieces::MonumentB
     entryRoom = grid[ENTRY_INDEX];
 
     
-    for (int x = 0; x < 5; ++x)
-    for (int y = 0; y < 3; ++y)
-    for (int z = 0; z < 5; ++z)
-    {
-        int idx = Piece::roomIndex(x, y, z);
-        if (grid[idx] == nullptr) continue;
-
-    
-        static const int dx[6] = { 0, 0, 0, 0,-1, 1 };
-        static const int dy[6] = {-1, 1, 0, 0, 0, 0 };
-        static const int dz[6] = { 0, 0,-1, 1, 0, 0 };
-        static const int oppFacing[6] = { 1, 0, 3, 2, 5, 4 };
-
-        for (int f = 0; f < 6; ++f)
+        for (int x = 0; x < 5; ++x)
+        for (int y = 0; y < 3; ++y)
+        for (int z = 0; z < 5; ++z)
         {
-            int nx = x + dx[f];
-            int ny = y + dy[f];
-            int nz = z + dz[f];
-            if (nx < 0 || nx >= 5 || ny < 0 || ny >= 3 || nz < 0 || nz >= 5) continue;
-            int nidx = Piece::roomIndex(nx, ny, nz);
-            if (grid[nidx] == nullptr) continue;
+            int idx = Piece::roomIndex(x, y, z);
+            if (grid[idx] == nullptr) continue;
 
-            
-            if (nidx <= idx) continue;
+            for (int f = 0; f < 6; ++f)
+            {
+                int nx = x + Facing::STEP_X[f];
+                int ny = y + Facing::STEP_Y[f];
+                int nz = z + Facing::STEP_Z[f];
+                if (nx < 0 || nx >= 5 || ny < 0 || ny >= 3 || nz < 0 || nz >= 5) continue;
+                int nidx = Piece::roomIndex(nx, ny, nz);
+                if (grid[nidx] == nullptr) continue;
+                //if (nidx <= idx) continue;
 
-            if (nz != z)
-            {
-                
-                int opp = (f % 2 == 0) ? f + 1 : f - 1;
-                grid[idx]->connectTo(opp, grid[nidx]);
-            }
-            else
-            {
-                grid[idx]->connectTo(f, grid[nidx]);
+
+                if (nz != z)
+                {
+
+
+
+
+
+
+
+
+                    int opp = Facing::OPPOSITE_FACING[f];
+                    grid[idx]->connectTo(opp, grid[nidx]);
+                }
+                else
+                {
+                    grid[idx]->connectTo(f, grid[nidx]);
+                }
             }
         }
-    }
-
     
     RoomDefinition* specialUp    = new RoomDefinition(1003);
     RoomDefinition* specialWing1 = new RoomDefinition(1001);
@@ -1482,15 +1481,15 @@ OceanMonumentPieces::EntryRoom::EntryRoom(int facing, RoomDefinition* room)
 
 bool OceanMonumentPieces::EntryRoom::postProcess(Level* level, Random* random, BoundingBox* chunkBB)
 {
-    generateBox(level, chunkBB, 0, 1, 0, 2, 1, 2, Tile::prismarine_Id, blockPrismarineBricks(),Tile::prismarine_Id, blockPrismarineBricks(), false);
-    generateBox(level, chunkBB, 5, 3, 0, 7, 3, 7, Tile::prismarine_Id, blockPrismarineBricks(),Tile::prismarine_Id, blockPrismarineBricks(), false);
-    generateBox(level, chunkBB, 6, 2, 0, 7, 2, 7, Tile::prismarine_Id, blockPrismarineBricks(),Tile::prismarine_Id, blockPrismarineBricks(), false);
-    generateBox(level, chunkBB, 0, 2, 0, 1, 2, 7, Tile::prismarine_Id, blockPrismarineBricks(),Tile::prismarine_Id, blockPrismarineBricks(), false);
-    generateBox(level, chunkBB, 0, 1, 0, 0, 1, 7, Tile::prismarine_Id, blockPrismarineBricks(),Tile::prismarine_Id, blockPrismarineBricks(), false);
-    generateBox(level, chunkBB, 7, 1, 0, 7, 1, 7, Tile::prismarine_Id, blockPrismarineBricks(),Tile::prismarine_Id, blockPrismarineBricks(), false);
-    generateBox(level, chunkBB, 0, 1, 7, 7, 3, 7, Tile::prismarine_Id, blockPrismarineBricks(),Tile::prismarine_Id, blockPrismarineBricks(), false);
-    generateBox(level, chunkBB, 1, 1, 0, 2, 3, 0, Tile::prismarine_Id, blockPrismarineBricks(),Tile::prismarine_Id, blockPrismarineBricks(), false);
-    generateBox(level, chunkBB, 5, 1, 0, 6, 3, 0, Tile::prismarine_Id, blockPrismarineBricks(),Tile::prismarine_Id, blockPrismarineBricks(), false);
+    generateBox(level, chunkBB, 0, 3, 0, 2, 3, 7, Tile::prismarine_Id, blockPrismarineBricks(), Tile::prismarine_Id, blockPrismarineBricks(), false);
+    generateBox(level, chunkBB, 5, 3, 0, 7, 3, 7, Tile::prismarine_Id, blockPrismarineBricks(), Tile::prismarine_Id, blockPrismarineBricks(), false);
+    generateBox(level, chunkBB, 0, 2, 0, 1, 2, 7, Tile::prismarine_Id, blockPrismarineBricks(), Tile::prismarine_Id, blockPrismarineBricks(), false);
+    generateBox(level, chunkBB, 6, 2, 0, 7, 2, 7, Tile::prismarine_Id, blockPrismarineBricks(), Tile::prismarine_Id, blockPrismarineBricks(), false);
+    generateBox(level, chunkBB, 0, 1, 0, 0, 1, 7, Tile::prismarine_Id, blockPrismarineBricks(), Tile::prismarine_Id, blockPrismarineBricks(), false);
+    generateBox(level, chunkBB, 7, 1, 0, 7, 1, 7, Tile::prismarine_Id, blockPrismarineBricks(), Tile::prismarine_Id, blockPrismarineBricks(), false);
+    generateBox(level, chunkBB, 0, 1, 7, 7, 3, 7, Tile::prismarine_Id, blockPrismarineBricks(), Tile::prismarine_Id, blockPrismarineBricks(), false);
+    generateBox(level, chunkBB, 1, 1, 0, 2, 3, 0, Tile::prismarine_Id, blockPrismarineBricks(), Tile::prismarine_Id, blockPrismarineBricks(), false);
+    generateBox(level, chunkBB, 5, 1, 0, 6, 3, 0, Tile::prismarine_Id, blockPrismarineBricks(), Tile::prismarine_Id, blockPrismarineBricks(), false);
 
     if (roomDef->hasOpening[F_NORTH]) fillWithAirOrWater(level, chunkBB, 3, 1, 7, 4, 2, 7, false);
     if (roomDef->hasOpening[F_WEST])  fillWithAirOrWater(level, chunkBB, 0, 1, 3, 1, 2, 4, false);
