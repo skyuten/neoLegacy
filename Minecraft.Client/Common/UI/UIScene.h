@@ -253,6 +253,8 @@ protected:
 	virtual void handleCheckboxToggled(F64 controlId, bool selected) {}
 	virtual void handleSliderMove(F64 sliderId, F64 currentValue) {}
 	virtual void handleAnimationEnd() {}
+public:
+	virtual bool canMoveSlider(F64 sliderId) { return true; }
 	virtual void handleSelectionChanged(F64 selectedId) {}
 	virtual void handleRequestMoreData(F64 startIndex, bool up) {}
 	virtual void handleTouchBoxRebuild() {}

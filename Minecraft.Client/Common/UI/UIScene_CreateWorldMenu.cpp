@@ -722,6 +722,16 @@ void UIScene_CreateWorldMenu::handleSliderMove(F64 sliderId, F64 currentValue)
 	}
 }
 
+bool UIScene_CreateWorldMenu::canMoveSlider(F64 sliderId)
+{
+    // Prevent gamemode slider movement when hardcore is enabled
+    if (sliderId == eControl_GameModeToggle && s_bHardcore)
+        return false;
+    
+    return true;
+}
+
+
 void UIScene_CreateWorldMenu::handleTimerComplete(int id)
 {
 #ifdef __PSVITA__

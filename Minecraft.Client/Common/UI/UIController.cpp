@@ -1104,8 +1104,11 @@ void UIController::tickInput()
 
 								if (sceneMouseX >= cx && sceneMouseX <= cx + cw && sceneMouseY >= cy && sceneMouseY <= cy + ch)
 								{
-									m_mouseDraggingSliderScene = pScene->getSceneType();
-									m_mouseDraggingSliderId = pSlider->getId();
+									if (pScene->canMoveSlider(pSlider->getId()))
+									{
+										m_mouseDraggingSliderScene = pScene->getSceneType();
+										m_mouseDraggingSliderId = pSlider->getId();
+									}
 									break;
 								}
 							}
@@ -1115,7 +1118,7 @@ void UIController::tickInput()
 					if (leftDown && m_mouseDraggingSliderScene == pScene->getSceneType() && m_mouseDraggingSliderId >= 0)
 					{
 						UIControl_Slider *pSlider = FindSliderById(pScene, m_mouseDraggingSliderId);
-						if (pSlider && pSlider->getVisible())
+						if (pSlider && pSlider->getVisible() && pScene->canMoveSlider(m_mouseDraggingSliderId))
 						{
 							pSlider->UpdateControl();
 							S32 sliderX = pSlider->getXPos() + panelOffsetX;

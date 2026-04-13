@@ -100,6 +100,7 @@ protected:
 	void handlePress(F64 controlId, F64 childId);
 	void handleSliderMove(F64 sliderId, F64 currentValue);
 	virtual void handleGainFocus(bool navBack);
+	virtual bool canMoveSlider(F64 sliderId);
 
 private:
 	void StartSharedLaunchFlow();

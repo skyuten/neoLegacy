@@ -1040,6 +1040,14 @@ void UIScene_LoadMenu::handleSliderMove(F64 sliderId, F64 currentValue)
 	}
 }
 
+bool UIScene_LoadMenu::canMoveSlider(F64 sliderId)
+{
+    if (sliderId == eControl_GameMode && m_bHardcore)
+        return false;
+    
+    return true;
+}
+
 void UIScene_LoadMenu::handleTouchBoxRebuild()
 {
 	m_bRebuildTouchBoxes = true;
