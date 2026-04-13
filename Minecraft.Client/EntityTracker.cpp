@@ -85,7 +85,7 @@ void EntityTracker::addEntity(shared_ptr<Entity> e, int range, int updateInterva
 	{
 		assert(false);	// Entity already tracked
 	}
-	if( e->entityId >= 2048 )
+	if( e->entityId >= 16384 )
 	{
 		__debugbreak();
 	}
