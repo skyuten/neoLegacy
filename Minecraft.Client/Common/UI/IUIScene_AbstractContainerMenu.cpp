@@ -293,7 +293,7 @@ void IUIScene_AbstractContainerMenu::handleEnchantButton(int slot, int iPad) {
 			eMinecraftColour colCost = costEnough ? eHTMLColor_7 : eHTMLColor_c;
 
 			std::wstring message = costEnough
-				? std::to_wstring(menu->costs[slot]) + L" Enchantment Levels"
+				? std::to_wstring(slot + 1) + (slot == 0 ? L" Enchantment Level" : L" Enchantment Levels")
 				: L"Level Requirement: " + std::to_wstring(menu->costs[slot]);
 
 			vector<HtmlString>* lines = new vector<HtmlString>();

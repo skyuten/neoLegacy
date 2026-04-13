@@ -11,7 +11,7 @@ RegionHillsLayer::RegionHillsLayer(int64_t seed, shared_ptr<Layer> parent) : Lay
 	this->riverNoise = nullptr;
 }
 
-RegionHillsLayer::RegionHillsLayer(int64_t seed, shared_ptr<Layer> parent, shared_ptr<Layer> riverNoise) : Layer(seed)
+RegionHillsLayer::RegionHillsLayer(int64_t seed, shared_ptr<Layer> parent, shared_ptr<Layer> riverNoise, int64_t seedMixup) : Layer(seedMixup)
 {
 	this->parent     = parent;
 	this->riverNoise = riverNoise;

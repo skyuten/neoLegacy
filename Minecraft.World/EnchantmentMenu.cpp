@@ -196,7 +196,7 @@ bool EnchantmentMenu::clickMenuButton(shared_ptr<Player> player, int i)
 			if (newEnchantment != nullptr)
 			{
 				
-				player->giveExperienceLevels(-costs[i]);
+				player->giveExperienceLevels(-(i + 1));
 				if (isBook) item->id = Item::enchantedBook_Id;
 				int randomIndex = isBook ? random.nextInt(newEnchantment->size()) : -1;
 				

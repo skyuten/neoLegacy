@@ -285,6 +285,10 @@ if __name__=="__main__": notecolors()
    <colour name="Mob_Rabbit_Colour2" value="734831"/>
    <colour name="Mob_Endermite_Colour1" value="161616"/>
    <colour name="Mob_Endermite_Colour2" value="6E6E6E"/>
+   <colour name="Mob_Guardian_Colour1" value="5A8272"/>
+   <colour name="Mob_Guardian_Colour2" value="F17D30"/>
+   <colour name="Mob_ElderGuardian_Colour1" value="CECCBA"/>
+   <colour name="Mob_ElderGuardian_Colour2" value="747693"/>
 
   <colour name="Armour_Default_Leather_Colour" value="A06540"/>
 

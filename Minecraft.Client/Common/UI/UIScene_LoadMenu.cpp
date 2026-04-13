@@ -1915,6 +1915,7 @@ void UIScene_LoadMenu::handleGainFocus(bool navBack)
 	{
 		m_checkboxOnline.setChecked(m_MoreOptionsParams.bOnlineGame == TRUE);
 	}
+	SetFocusToElement(eControl_GameMode);
 }
 
 #ifdef __ORBIS__

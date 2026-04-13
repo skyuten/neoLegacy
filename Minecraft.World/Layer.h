@@ -16,12 +16,12 @@ private:
 protected:
 	shared_ptr<Layer>parent;
 
-private:
+protected:
 	int64_t rval;
 	int64_t seedMixup;
 
 public:
-	static LayerArray getDefaultLayers(int64_t seed, LevelType *levelType);
+	static LayerArray getDefaultLayers(int64_t seed, LevelType *levelType, void* superflatConfig = nullptr);
 
 	Layer(int64_t seedMixup);
 

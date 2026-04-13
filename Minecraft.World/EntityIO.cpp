@@ -46,7 +46,7 @@ void EntityIO::staticCtor()
 {
 	setId(ItemEntity::create, eTYPE_ITEMENTITY,  L"Item", 1);
 	setId(ExperienceOrb::create, eTYPE_EXPERIENCEORB, L"XPOrb", 2);
-	setId(Guardian::create, eTYPE_ELDER_GUARDIAN, L"ElderGuardian", 4, eMinecraftColour_Armour_Default_Leather_Colour, eMinecraftColour_Sky_IceMountains, IDS_PIGZOMBIE);
+	setId(Guardian::create, eTYPE_ELDER_GUARDIAN, L"ElderGuardian", 4, eMinecraftColour_Mob_ElderGuardian_Colour1, eMinecraftColour_Mob_ElderGuardian_Colour2, IDS_GUARDIAN_ELDER);
 	setId(LeashFenceKnotEntity::create, eTYPE_LEASHFENCEKNOT, L"LeashKnot", 8);
 	setId(Painting::create, eTYPE_PAINTING, L"Painting", 9);
 	setId(Arrow::create, eTYPE_ARROW, L"Arrow", 10);
@@ -100,7 +100,7 @@ void EntityIO::staticCtor()
       eMinecraftColour_Mob_Endermite_Colour1,
       eMinecraftColour_Mob_Endermite_Colour2, IDS_ENDERMITE);
 
-	setId(Guardian::create, eTYPE_GUARDIAN, L"Guardian", 68, eMinecraftColour_Mob_Witch_Colour1, eMinecraftColour_Mob_Witch_Colour2, IDS_WITCH);
+	setId(Guardian::create, eTYPE_GUARDIAN, L"Guardian", 68, eMinecraftColour_Mob_Guardian_Colour1, eMinecraftColour_Mob_Guardian_Colour2, IDS_GUARDIAN);
 	
 
 	setId(Pig::create, eTYPE_PIG, L"Pig", 90, eMinecraftColour_Mob_Pig_Colour1, eMinecraftColour_Mob_Pig_Colour2, IDS_PIG);

@@ -1,214 +1,201 @@
-#include "stdafx.h"
-#include "net.minecraft.world.level.newbiome.layer.h"
-#include "net.minecraft.world.level.h"
-#include "BiomeOverrideLayer.h"
+	#include "stdafx.h"
+	#include "net.minecraft.world.level.newbiome.layer.h"
+	#include "RiverInitLayer.h"
+	#include "RareBiomeSpotLayer.h"
+	#include "net.minecraft.world.level.h"
+	#include "BiomeOverrideLayer.h"
+	#include "CustomizableSourceSettings.h"
 
-#ifdef __PSVITA__
-// AP - this is used to perform fast 64bit divides of known values
-#include "../Minecraft.Client/PSVita/PSVitaExtras/libdivide.h"
+	#ifdef __PSVITA__
+	// AP - this is used to perform fast 64bit divides of known values
+	#include "../Minecraft.Client/PSVita/PSVitaExtras/libdivide.h"
+#include <ImposeContinentsLayer.h>
 
-libdivide::divider<long long> fast_d2(2);
-libdivide::divider<long long> fast_d3(3);
-libdivide::divider<long long> fast_d4(4);
-libdivide::divider<long long> fast_d5(5);
-libdivide::divider<long long> fast_d6(6);
-libdivide::divider<long long> fast_d7(7);
-libdivide::divider<long long> fast_d10(10);
-#endif
 
-LayerArray Layer::getDefaultLayers(int64_t seed, LevelType *levelType)
-{
-	// 4J - Some changes moved here from 1.2.3. Temperature & downfall layers are no longer created & returned, and a debug layer is isn't.
-	// For reference with regard to future merging, things NOT brought forward from the 1.2.3 version are new layer types that we
-	// don't have yet (shores, swamprivers, region hills etc.)
-	shared_ptr<Layer>islandLayer = std::make_shared<IslandLayer>(1);
-	islandLayer = std::make_shared<FuzzyZoomLayer>(2000, islandLayer);
-	islandLayer = std::make_shared<AddIslandLayer>(1, islandLayer);
-	islandLayer = std::make_shared<ZoomLayer>(2001, islandLayer);
-	islandLayer = std::make_shared<AddIslandLayer>(2, islandLayer);
-	islandLayer = std::make_shared<RemoveTooMuchOceanLayer>(2, islandLayer);
-	islandLayer = std::make_shared<AddSnowLayer>(2, islandLayer);
-	islandLayer = std::make_shared<ZoomLayer>(2002, islandLayer);
-	islandLayer = std::make_shared<AddIslandLayer>(3, islandLayer);
-	islandLayer = std::make_shared<ZoomLayer>(2003, islandLayer);
-	islandLayer = std::make_shared<AddIslandLayer>(4, islandLayer);
+	libdivide::divider<long long> fast_d2(2);
+	libdivide::divider<long long> fast_d3(3);
+	libdivide::divider<long long> fast_d4(4);
+	libdivide::divider<long long> fast_d5(5);
+	libdivide::divider<long long> fast_d6(6);
+	libdivide::divider<long long> fast_d7(7);
+	libdivide::divider<long long> fast_d10(10);
+	#endif
 
-//	islandLayer = shared_ptr<Layer>(new AddMushroomIslandLayer(5, islandLayer));		// 4J - old position of mushroom island layer
+LayerArray Layer::getDefaultLayers(int64_t seed, LevelType* levelType, void* superflatConfig) {
+    
+    
+    shared_ptr<Layer> islandLayer = std::make_shared<IslandLayer>(seed, 1);
+    islandLayer = std::make_shared<FuzzyZoomLayer>(seed, islandLayer, 0x7D0);
+    islandLayer = std::make_shared<AddIslandLayer>(seed, islandLayer, 1);
+    islandLayer = std::make_shared<ZoomLayer>(seed, islandLayer, 0x7D1);      
+    islandLayer = std::make_shared<AddIslandLayer>(seed, islandLayer, 2);
+    islandLayer = std::make_shared<AddIslandLayer>(seed, islandLayer, 0x32);  
+    islandLayer = std::make_shared<AddIslandLayer>(seed, islandLayer, 0x46);  
+    islandLayer = std::make_shared<RemoveTooMuchOceanLayer>(seed, islandLayer, 2);
+    islandLayer = std::make_shared<AddSnowLayer>(seed, islandLayer, 2);
+    islandLayer = std::make_shared<AddIslandLayer>(seed, islandLayer, 3);
+    islandLayer = std::make_shared<AddEdgeLayer>(seed, islandLayer, 2, 0); 
+    islandLayer = std::make_shared<AddEdgeLayer>(seed, islandLayer, 2, 1); 
+    islandLayer = std::make_shared<AddEdgeLayer>(seed, islandLayer, 3, 2);
+    islandLayer = std::make_shared<ZoomLayer>(seed, islandLayer, 0x7D2); 
+    islandLayer = std::make_shared<ZoomLayer>(seed, islandLayer, 0x7D3);  
+    islandLayer = std::make_shared<AddIslandLayer>(seed, islandLayer, 4);
+    islandLayer = std::make_shared<AddMushroomIslandLayer>(seed, islandLayer, 5);
+    islandLayer = std::make_shared<DeepOceanLayer>(seed, islandLayer, 4);
 
-	int zoomLevel = 4; 
-	if (levelType == LevelType::lvl_largeBiomes)
+    shared_ptr<Layer> baseLayer = ZoomLayer::zoom(seed, islandLayer, 0x3E8, 0); 
+    int zoomLevel = 4;
+    int riverZoomCount = 4;
+
+    if (levelType == LevelType::lvl_customized && superflatConfig != nullptr) {
+        auto settings = CustomizableSourceSettings::Builder::build(
+            CustomizableSourceSettings::Builder::fromString(superflatConfig));
+        zoomLevel = settings->getBiomeSize();
+        riverZoomCount = settings->getRiverSize();
+    }
+    
+    if (levelType == LevelType::lvl_largeBiomes) {
+        zoomLevel = 6;
+    }
+
+    
+    shared_ptr<Layer> riverInit = make_shared<RiverInitLayer>(seed, baseLayer, 0x64); 
+    
+    
+    shared_ptr<Layer> hillsNoise = ZoomLayer::zoom(seed, riverInit, 0x3E8, 2); 
+    
+    
+    shared_ptr<Layer> riverLayerFinal = ZoomLayer::zoom(seed, riverInit, 0x3E8, 2);
+    riverLayerFinal = ZoomLayer::zoom(seed, riverLayerFinal, 0x3E8, riverZoomCount);
+    
+    riverLayerFinal = make_shared<RiverLayer>(seed, riverLayerFinal, 1);
+    riverLayerFinal = make_shared<SmoothLayer>(seed, riverLayerFinal, 0x3E8);
+    
+   
+    shared_ptr<Layer> biomeLayer = make_shared<BiomeInitLayer>(seed, baseLayer, 0xC8, levelType, superflatConfig); 
+    biomeLayer = ZoomLayer::zoom(seed, biomeLayer, 0x3E8, 2);
+    biomeLayer = make_shared<BiomeEdgeLayer>(seed, biomeLayer, 0x3E8);
+    biomeLayer = make_shared<RegionHillsLayer>(seed, biomeLayer, hillsNoise, 0x3E8);
+    biomeLayer = make_shared<RareBiomeSpotLayer>(seed, biomeLayer, 0x3E9); 
+
+    
+    for (int i = 0; i < zoomLevel; ++i) {
+        biomeLayer = make_shared<ZoomLayer>(seed, biomeLayer, 0x3E8 + i);
+        
+        if (i == 0) {
+            biomeLayer = make_shared<AddIslandLayer>(seed, biomeLayer, 3);
+        }
+        
+        if (i == 1 || zoomLevel == 1) {
+            biomeLayer = make_shared<ShoreLayer>(seed, biomeLayer, 0x3E8);
+        }
+    }
+
+    biomeLayer = make_shared<SmoothLayer>(seed, biomeLayer, 0x3E8);
+
+    
+    shared_ptr<Layer> mixed = make_shared<RiverMixerLayer>(seed, biomeLayer, riverLayerFinal, 0x64); 
+    shared_ptr<Layer> voronoi = make_shared<VoronoiZoom>(seed, mixed, 0xA); 
+
+    mixed->init(seed);
+    voronoi->init(seed);
+
+    LayerArray result(3, false);
+    result[0] = mixed;    
+    result[1] = voronoi;  
+    result[2] = mixed;    
+    return result;
+}
+
+	Layer::Layer(int64_t seedMixup)
 	{
-		zoomLevel = 6; 
+		parent = nullptr;
+
+		this->seedMixup = seedMixup;
+		this->seedMixup *= this->seedMixup * 6364136223846793005l + 1442695040888963407l;
+		this->seedMixup += seedMixup;
+		this->seedMixup *= this->seedMixup * 6364136223846793005l + 1442695040888963407l;
+		this->seedMixup += seedMixup;
+		this->seedMixup *= this->seedMixup * 6364136223846793005l + 1442695040888963407l;
+		this->seedMixup += seedMixup;
 	}
-	
-
-	shared_ptr<Layer> riverLayer = islandLayer;
-	riverLayer = ZoomLayer::zoom(1000, riverLayer, 0);
-	riverLayer = std::make_shared<RiverInitLayer>(100, riverLayer);
-	riverLayer = ZoomLayer::zoom(1000, riverLayer, zoomLevel + 2);
-	riverLayer = std::make_shared<RiverLayer>(1, riverLayer);
-	riverLayer = std::make_shared<SmoothLayer>(1000, riverLayer);
-
-	shared_ptr<Layer> biomeLayer = islandLayer;
-	biomeLayer = ZoomLayer::zoom(1000, biomeLayer, 0);
-
-	biomeLayer = std::make_shared<BiomeInitLayer>(200, biomeLayer, levelType);
 
 
-	biomeLayer = ZoomLayer::zoom(1000, biomeLayer, 2);
 
-	
-	shared_ptr<Layer> hillsNoise = islandLayer;
-	hillsNoise = ZoomLayer::zoom(1000, hillsNoise, 0);
-	hillsNoise = std::make_shared<RiverInitLayer>(100, hillsNoise);
-	hillsNoise = ZoomLayer::zoom(1000, hillsNoise, 2);
-
-	biomeLayer = std::make_shared<RegionHillsLayer>(1000, biomeLayer, hillsNoise);
-	biomeLayer = std::make_shared<RareBiomeLayer>(1001, biomeLayer);
-
-	for (int i = 0; i < zoomLevel; i++)
+	void Layer::initRandom(int64_t x, int64_t y)
 	{
-		biomeLayer = std::make_shared<ZoomLayer>(1000 + i, biomeLayer);
+		rval = seed;
+		rval *= rval * 6364136223846793005l + 1442695040888963407l;
+		rval += x;
+		rval *= rval * 6364136223846793005l + 1442695040888963407l;
+		rval += y;
+		rval *= rval * 6364136223846793005l + 1442695040888963407l;
+		rval += x;
+		rval *= rval * 6364136223846793005l + 1442695040888963407l;
+		rval += y;
+	}
 
-	if (i == 0) biomeLayer = std::make_shared<AddIslandLayer>(3, biomeLayer);
-
-		if (i == 0)
+	int Layer::nextRandom(int max)
+	{
+	#ifdef __PSVITA__
+		// AP - 64bit mods are very slow on Vita. Replaced with a divide/mult for general case and a fast divide library for specific numbers
+		// todo - this can sometimes yield a different number to the original. There's a strange bug sometimes with Vita where if the line
+		// "result = (int) ((rval >> 24) % max);" is done twice in a row 'result' will not be the same. Need to speak to Sony about that
+		// Also need to compare level against a different platform using the same seed
+		int result;
+		long long temp = rval;
+		temp >>= 24;
+		if( max == 2 )
 		{
-			// 4J - moved mushroom islands to here. This skips 3 zooms that the old location of the add was, making them about 1/8 of the original size. Adding
-			// them at this scale actually lets us place them near enough other land, if we add them at the same scale as java then they have to be too far out to see for
-			// the scale of our maps
-			biomeLayer = std::make_shared<AddMushroomIslandLayer>(5, biomeLayer);
-			//Adding Deep Ocean here as well, now that we are at a suitable scale for LCE maps.
-			biomeLayer = std::make_shared<DeepOceanLayer>(4, biomeLayer);
+			result = temp-(temp/fast_d2)*2;
 		}
-
-		if (i == 1 )
+		else if( max == 3 )
 		{
-			// 4J - now expand mushroom islands up again. This does a simple region grow to add a new mushroom island element when any of the neighbours are also mushroom islands.
-			// This helps make the islands into nice compact shapes of the type that are actually likely to be able to make an island out of the sea in a small space. Also
-			// helps the shore layer from doing too much damage in shrinking the islands we are making
-			biomeLayer = std::make_shared<GrowMushroomIslandLayer>(5, biomeLayer);
-			// Note - this reduces the size of mushroom islands by turning their edges into shores. We are doing this at i == 1 rather than i == 0 as the original does
-			biomeLayer = std::make_shared<ShoreLayer>(1000, biomeLayer);
-
-			biomeLayer = std::make_shared<SwampRiversLayer>(1000, biomeLayer);
+			result = temp-(temp/fast_d3)*3;
 		}
+		else if( max == 4 )
+		{
+			result = temp-(temp/fast_d4)*4;
+		}
+		else if( max == 5 )
+		{
+			result = temp-(temp/fast_d5)*5;
+		}
+		else if( max == 6 )
+		{
+			result = temp-(temp/fast_d6)*6;
+		}
+		else if( max == 7 )
+		{
+			result = temp-(temp/fast_d7)*7;
+		}
+		else if( max == 10 )
+		{
+			result = temp-(temp/fast_d10)*10;
+		}
+		else
+		{
+			result = temp-(temp/max)*max;
+		}
+	#else
+
+		int result = static_cast<int>((rval >> 24) % max);
+	#endif
+
+		if (result < 0) result += max;
+		rval *= rval * 6364136223846793005l + 1442695040888963407l;
+		rval += seed;
+		return result;
 	}
 
-	biomeLayer = std::make_shared<SmoothLayer>(1000, biomeLayer);
-
-	biomeLayer = std::make_shared<RiverMixerLayer>(100, biomeLayer, riverLayer);
-
-#ifndef _CONTENT_PACKAGE
-#ifdef _BIOME_OVERRIDE
-	if(app.DebugSettingsOn() && app.GetGameSettingsDebugMask(ProfileManager.GetPrimaryPad())&(1L<<eDebugSetting_EnableBiomeOverride))
-	{
-		biomeLayer = std::make_shared<BiomeOverrideLayer>(1);
-	}
-#endif
-#endif
-
-	shared_ptr<Layer> debugLayer = biomeLayer;
-
-	shared_ptr<Layer>zoomedLayer = std::make_shared<VoronoiZoom>(10, biomeLayer);
-
-	biomeLayer->init(seed);
-	zoomedLayer->init(seed);
-
-	LayerArray result(3);
-	result[0] = biomeLayer;
-	result[1] = zoomedLayer;
-	result[2] = debugLayer;
-	return result;
-}
-
-Layer::Layer(int64_t seedMixup)
+void Layer::init(int64_t seed) 
 {
-	parent = nullptr;
-
-	this->seedMixup = seedMixup;
-	this->seedMixup *= this->seedMixup * 6364136223846793005l + 1442695040888963407l;
-	this->seedMixup += seedMixup;
-	this->seedMixup *= this->seedMixup * 6364136223846793005l + 1442695040888963407l;
-	this->seedMixup += seedMixup;
-	this->seedMixup *= this->seedMixup * 6364136223846793005l + 1442695040888963407l;
-	this->seedMixup += seedMixup;
-}
-
-void Layer::init(int64_t seed)
-{
-	this->seed = seed;
-	if (parent != nullptr) parent->init(seed);
-	this->seed *= this->seed * 6364136223846793005l + 1442695040888963407l;
-	this->seed += seedMixup;
-	this->seed *= this->seed * 6364136223846793005l + 1442695040888963407l;
-	this->seed += seedMixup;
-	this->seed *= this->seed * 6364136223846793005l + 1442695040888963407l;
-	this->seed += seedMixup;
-}
-
-void Layer::initRandom(int64_t x, int64_t y)
-{
-	rval = seed;
-	rval *= rval * 6364136223846793005l + 1442695040888963407l;
-	rval += x;
-	rval *= rval * 6364136223846793005l + 1442695040888963407l;
-	rval += y;
-	rval *= rval * 6364136223846793005l + 1442695040888963407l;
-	rval += x;
-	rval *= rval * 6364136223846793005l + 1442695040888963407l;
-	rval += y;
-}
-
-int Layer::nextRandom(int max)
-{
-#ifdef __PSVITA__
-	// AP - 64bit mods are very slow on Vita. Replaced with a divide/mult for general case and a fast divide library for specific numbers
-	// todo - this can sometimes yield a different number to the original. There's a strange bug sometimes with Vita where if the line
-	// "result = (int) ((rval >> 24) % max);" is done twice in a row 'result' will not be the same. Need to speak to Sony about that
-	// Also need to compare level against a different platform using the same seed
-	int result;
-	long long temp = rval;
-	temp >>= 24;
-	if( max == 2 )
-	{
-		result = temp-(temp/fast_d2)*2;
-	}
-	else if( max == 3 )
-	{
-		result = temp-(temp/fast_d3)*3;
-	}
-	else if( max == 4 )
-	{
-		result = temp-(temp/fast_d4)*4;
-	}
-	else if( max == 5 )
-	{
-		result = temp-(temp/fast_d5)*5;
-	}
-	else if( max == 6 )
-	{
-		result = temp-(temp/fast_d6)*6;
-	}
-	else if( max == 7 )
-	{
-		result = temp-(temp/fast_d7)*7;
-	}
-	else if( max == 10 )
-	{
-		result = temp-(temp/fast_d10)*10;
-	}
-	else
-	{
-		result = temp-(temp/max)*max;
-	}
-#else
-
-	int result = static_cast<int>((rval >> 24) % max);
-#endif
-
-	if (result < 0) result += max;
-	rval *= rval * 6364136223846793005l + 1442695040888963407l;
-	rval += seed;
-	return result;
+    this->seed = seed;
+    if (parent != nullptr) parent->init(seed);
+    this->seed *= this->seed * 6364136223846793005LL + 1442695040888963407LL;
+    this->seed += seedMixup;
+    this->seed *= this->seed * 6364136223846793005LL + 1442695040888963407LL;
+    this->seed += seedMixup;
+    this->seed *= this->seed * 6364136223846793005LL + 1442695040888963407LL;
+    this->seed += seedMixup;
 }

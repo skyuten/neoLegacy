@@ -3,7 +3,7 @@
 #include "IntCache.h"
 #include "DeepOceanLayer.h"
 
-DeepOceanLayer::DeepOceanLayer(int64_t seed, shared_ptr<Layer> parent) : Layer(seed)
+DeepOceanLayer::DeepOceanLayer(int64_t seed, shared_ptr<Layer> parent, int64_t seedMixup) : Layer(seedMixup)
 {
 	this->parent = parent;
 }

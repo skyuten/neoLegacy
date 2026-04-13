@@ -267,6 +267,10 @@ const wchar_t *ColourTable::ColourTableElements[eMinecraftColour_COUNT] =
 	L"Mob_Rabbit_Colour2",
 	L"Mob_Endermite_Colour1",
 	L"Mob_Endermite_Colour2",
+	L"Mob_Guardian_Colour1",
+	L"Mob_Guardian_Colour2",
+	L"Mob_ElderGuardian_Colour1",
+	L"Mob_ElderGuardian_Colour2",
 
 	
 

@@ -3,7 +3,7 @@
 #include "IntCache.h"
 #include "RemoveTooMuchOceanLayer.h"
 
-RemoveTooMuchOceanLayer::RemoveTooMuchOceanLayer(int64_t seed, shared_ptr<Layer> parent) : Layer(seed)
+RemoveTooMuchOceanLayer::RemoveTooMuchOceanLayer(int64_t seed, shared_ptr<Layer> parent, int64_t seedMixup) : Layer(seedMixup)
 {
 	this->parent = parent;
 }
@@ -26,12 +26,16 @@ intArray RemoveTooMuchOceanLayer::getArea(int xo, int yo, int w, int h)
 			int i2 = aint[j1 + 1 - 1 + (i1 + 1) * (w + 2)];
 			int j2 = aint[j1 + 1 + (i1 + 1 + 1) * (w + 2)];
 			int k2 = aint[j1 + 1 + (i1 + 1) * k];
+			
 			aint1[j1 + i1 * w] = k2;
 			this->initRandom((int64_t)(j1 + xo), (int64_t)(i1 + yo));
 
 			if (k2 == 0 && k1 == 0 && l1 == 0 && i2 == 0 && j2 == 0)
 			{
-				aint1[j1 + i1 * w] = 1;
+				if (this->nextRandom(2) == 0)
+				{
+					aint1[j1 + i1 * w] = 1;
+				}
 			}
 		}
 	}

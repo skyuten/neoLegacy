@@ -4,7 +4,7 @@
 #include "net.minecraft.world.level.h"
 #include "BiomeInitLayer.h"
 
-BiomeInitLayer::BiomeInitLayer(int64_t seed, shared_ptr<Layer> parent, LevelType *levelType) : Layer(seed)
+BiomeInitLayer::BiomeInitLayer(int64_t seed, shared_ptr<Layer> parent, int64_t seedMixup, LevelType *levelType, void* superflatConfig) : Layer(seedMixup)
 {
 	this->parent = parent;
 	bLegacy1_1 = (levelType == LevelType::lvl_normal_1_1);

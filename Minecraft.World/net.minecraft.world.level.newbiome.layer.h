@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AddIslandLayer.h"
+#include "AddEdgeLayer.h"
 #include "AddMushroomIslandLayer.h"
 #include "AddSnowLayer.h"
 #include "BiomeInitLayer.h"
@@ -29,3 +30,7 @@
 // 1.1.
 #include "RegionHillsLayer.h"
 #include "SwampRiversLayer.h"
+
+#include "RareBiomeSpotLayer.h"
+#include "BiomeEdgeLayer.h"
+#include "ImposeContinentsLayer.h"

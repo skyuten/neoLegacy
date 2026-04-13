@@ -528,3 +528,28 @@ int Biome::getRandomDoublePlantType(Random *random)
     if (type == 8) return 4; 
     return 2; 
 }
+Biome* Biome::getBiome(uint32_t id) {
+   
+    if (id < 257) {
+        Biome* b = Biome::biomes[id];
+        if (b != nullptr) {
+            return b;
+        }
+    }
+
+    
+    return Biome::ocean; 
+}
+Biome* Biome::getBiome(uint32_t id, Biome* fallback) {
+    if (id < 257) {
+        Biome* b = Biome::biomes[id];
+        if (b != nullptr) {
+            return b;
+        }
+        
+        return fallback;
+    }
+    
+   
+    return Biome::ocean;
+}

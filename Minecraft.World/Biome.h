@@ -227,5 +227,6 @@ public:
     virtual int getGrassColor() const;
     virtual Feature *getFlowerFeature(Random *random, int x, int y, int z);
     virtual int getRandomDoublePlantType(Random *random);
-    
+    Biome* getBiome(uint32_t id);
+    Biome* getBiome(uint32_t id, Biome* fallback);
 };
