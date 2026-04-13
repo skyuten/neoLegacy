@@ -10,12 +10,15 @@ function(setup_asset_folder_copy TARGET_NAME ASSET_FOLDER_PAIRS)
     "*.swf" # These are built into the .arc
     "*.resx" "*.loc"
     "*.wav" # Unsupported audio format
-    "*.xui"
+    "*.xui" "*.xgs"
+    "*.xwb" "*.xsb"
+    "*.xap" "*.xzp"
   )
 
   # Global folder exclusions applied to every folder copy
   set(ASSET_EXCLUDE_FOLDERS
     "Graphics"
+    "Gamerules"
   )
 
   # Exclude platform-specific arc media files
