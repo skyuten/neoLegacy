@@ -650,8 +650,10 @@ int main(int argc, char **argv)
 	{
 		// Only run seed validation when creating a brand-new world.
 		// Existing worlds already have their seed in level.dat.
-		LogInfof("startup", "Finding seed with biome diversity for %d-chunk world...", config.worldSizeChunks);
-		param->seed = BiomeSource::findSeed(LevelType::lvl_normal, config.worldSizeChunks);
+	    LogInfof("startup", "Finding seed with biome diversity for %d-chunk world...", config.worldSizeChunks);
+	    // LordCambion changes removed the worldSizeChunks param from BiomeSource#findSeed
+		// param->seed = BiomeSource::findSeed(LevelType::lvl_normal, config.worldSizeChunks);
+	    param->seed = BiomeSource::findSeed(LevelType::lvl_normal);
 		LogInfof("startup", "Selected seed: %lld", param->seed);
 	}
 	else
@@ -735,7 +737,7 @@ int main(int argc, char **argv)
 			break;
 		}
 
-		if (autosaveRequested && app.GetXuiServerAction(kServerActionPad) == eXuiServerAction_Idle && !ConsoleSaveFileOriginal::hasPendingBackgroundSave())
+		if (autosaveRequested && app.GetXuiServerAction(kServerActionPad) == eXuiServerAction_Idle)
 		{
 			LogWorldIO("autosave completed");
 			autosaveRequested = false;
@@ -749,7 +751,7 @@ int main(int argc, char **argv)
 		DWORD now = GetTickCount();
 		if ((LONG)(now - nextAutosaveTick) >= 0)
 		{
-            if (app.GetXuiServerAction(kServerActionPad) == eXuiServerAction_Idle && !ConsoleSaveFileOriginal::hasPendingBackgroundSave())
+			if (app.GetXuiServerAction(kServerActionPad) == eXuiServerAction_Idle)
 			{
 				LogWorldIO("requesting autosave");
 				app.SetXuiServerAction(kServerActionPad, eXuiServerAction_AutoSaveGame);
@@ -768,16 +770,14 @@ int main(int argc, char **argv)
 
 	LogInfof("shutdown", "Dedicated server stopped");
 	MinecraftServer *server = MinecraftServer::getInstance();
-    if (server != NULL && !ConsoleSaveFileOriginal::hasPendingBackgroundSave())
+	if (server != NULL)
 	{
-        server->setSaveOnExit(true);
+		server->setSaveOnExit(true);
+	}
+	if (server != NULL)
+	{
 		LogWorldIO("requesting save before shutdown");
 		LogWorldIO("using saveOnExit for shutdown");
-	}
-
-	if (ConsoleSaveFileOriginal::hasPendingBackgroundSave())
-    {
-        LogWorldIO("Waiting for autosave to complete...");
 	}
 
 	MinecraftServer::HaltServer();

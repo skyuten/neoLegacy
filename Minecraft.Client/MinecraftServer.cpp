@@ -742,7 +742,9 @@ bool MinecraftServer::initServer(int64_t seed, NetworkGameInitData *initData, DW
 #ifdef __PSVITA__
 		seed = BiomeSource::findSeed(pLevelType, &running, worldSizeChunks);
 #else
-		seed = BiomeSource::findSeed(pLevelType, worldSizeChunks);
+	    // LordCambion changes removed the worldSizeChunks param from BiomeSource#findSeed
+		// seed = BiomeSource::findSeed(pLevelType, worldSizeChunks);
+	    seed = BiomeSource::findSeed(pLevelType);
 #endif
 	}
 
