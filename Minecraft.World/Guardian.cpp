@@ -376,6 +376,7 @@ void Guardian::aiStep()
 {
     if (level->isClientSide)
     {
+        updateSize(isElder());
         clientSideTailAnimationO = clientSideTailAnimation;
 
         if (!isInWater())
