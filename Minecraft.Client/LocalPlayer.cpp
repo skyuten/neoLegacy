@@ -252,7 +252,7 @@ void LocalPlayer::aiStep()
 	bool forwardEnoughToContinueSprint = input->ya >= runTreshold;
 
 	// 4J - altered this slightly to make sure that the joypad returns to below returnTreshold in between registering two movements up to runThreshold
-	if (onGround && !isSprinting() && enoughFoodToSprint && !isUsingItem() && !hasEffect(MobEffect::blindness))
+	if ((onGround || isRiding()) && !isSprinting() && enoughFoodToSprint && !isUsingItem() && !hasEffect(MobEffect::blindness))
 	{
 		if( !wasRunning && forwardEnoughToTriggerSprint )
 		{
@@ -278,7 +278,7 @@ void LocalPlayer::aiStep()
 	}
 	if (isSneaking()) sprintTriggerTime = 0;
 #ifdef _WINDOWS64
-	if (input->sprinting && !isSprinting() && onGround && enoughFoodToSprint && !isUsingItem() && !hasEffect(MobEffect::blindness) && !isSneaking())
+	if (input->sprinting && !isSprinting() && (onGround || isRiding()) && enoughFoodToSprint && !isUsingItem() && !hasEffect(MobEffect::blindness) && !isSneaking())
 	{
 		setSprinting(true);
 	}
