@@ -39,6 +39,9 @@
 #include "../Minecraft.World/ProgressListener.h"
 #include "PS3/PS3Extras/ShutdownManager.h"
 #include "PlayerChunkMap.h"
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+#include "../Minecraft.Server/FourKitBridge.h"
+#endif
 
 WeighedTreasureArray ServerLevel::RANDOM_BONUS_ITEMS;
 
@@ -324,6 +327,8 @@ void ServerLevel::updateSleepingPlayerList()
 
 	for (auto& player : players)
 	{
+		if (player->fk_sleepingIgnored)
+			continue;
 		if (!player->isSleeping())
 		{
 			allPlayersSleeping = false;
@@ -368,6 +373,8 @@ bool ServerLevel::allPlayersAreSleeping()
 		// all players are sleeping, but have they slept long enough?
 		for (auto& player : players)
 		{
+			if (player->fk_sleepingIgnored)
+				continue;
 			//                System.out.println(player->entityId + ": " + player->getSleepTimer());
 			if (!player->isSleepingLongEnough())
 			{
@@ -507,15 +514,21 @@ void ServerLevel::tickTiles()
 			int val = (randValue >> 2);
 			int x = (val & 15);
 			int z = ((val >> 8) & 15);
-			int yy = getTopRainBlock(x + xo, z + zo);
-			if (shouldFreeze(x + xo, yy - 1, z + zo))
-			{
-				setTileAndUpdate(x + xo, yy - 1, z + zo, Tile::ice_Id);
-			}
-			if (isRaining() && shouldSnow(x + xo, yy, z + zo))
-			{
-				setTileAndUpdate(x + xo, yy, z + zo, Tile::topSnow_Id);
-			}
+					int yy = getTopRainBlock(x + xo, z + zo);
+						if (shouldFreeze(x + xo, yy - 1, z + zo))
+						{
+			#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+							if (!FourKitBridge::FireBlockForm(dimension->id, x + xo, yy - 1, z + zo, Tile::ice_Id, 0))
+			#endif
+							setTileAndUpdate(x + xo, yy - 1, z + zo, Tile::ice_Id);
+						}
+						if (isRaining() && shouldSnow(x + xo, yy, z + zo))
+						{
+			#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+							if (!FourKitBridge::FireBlockForm(dimension->id, x + xo, yy, z + zo, Tile::topSnow_Id, 0))
+			#endif
+							setTileAndUpdate(x + xo, yy, z + zo, Tile::topSnow_Id);
+						}
 			if (isRaining())
 			{
 				Biome *b = getBiome(x + xo, z + zo);
@@ -1052,9 +1065,14 @@ void ServerLevel::entityAdded(shared_ptr<Entity> e)
 	vector<shared_ptr<Entity> > *es = e->getSubEntities();
 	if (es)
 	{
+		// Reassign sub-entity IDs to be sequential from the parent's ID.
+		// The client assumes this layout when it applies an offset in handleAddMob.
+		int offset = 1;
 		for(auto& i : *es)
 		{
+			i->entityId = e->entityId + offset;
 			entitiesById.emplace(i->entityId, i);
+			offset++;
 		}
 	}
 	entityAddedExtra(e);	// 4J added

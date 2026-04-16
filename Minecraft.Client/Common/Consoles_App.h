@@ -22,6 +22,7 @@ using namespace std;
 #include "./GameRules/GameRuleManager.h"
 #include "../SkinBox.h"
 #include "../ArchiveFile.h"
+#include "lce_filesystem/FolderFile.h"
 
 typedef struct _JoinFromInviteData
 {
@@ -157,6 +158,7 @@ public:
 	void			SetSpecialTutorialCompletionFlag(int iPad, int index);
 
 	static			LPCWSTR			GetString(int iID);
+	static			LPCWSTR			GetString(const wchar_t *id);
 
 	eGameMode		GetGameMode()																										{ return m_eGameMode;}
 	void			SetGameMode(eGameMode eMode)																						{ m_eGameMode=eMode;}
@@ -432,7 +434,7 @@ public:
 	void loadStringTable();
 
 protected:
-	ArchiveFile *m_mediaArchive;
+	FolderFile *m_mediaArchive;
 	StringTable *m_stringTable;
 
 public:
@@ -565,7 +567,9 @@ public:
 	int GetHTMLColour(eMinecraftColour colour);
 	int GetHTMLColor(eMinecraftColour colour) { return GetHTMLColour(colour); }
 	int GetHTMLFontSize(EHTMLFontSize size);
-	wstring FormatHTMLString(int iPad, const wstring &desc, int shadowColour = 0xFFFFFFFF);
+	wstring FormatHTMLString(int iPad, const wstring& desc, int shadowColour = 0xFFFFFFFF);
+	wstring EscapeHTMLString(const wstring &desc);
+	wstring FormatChatMessage(const wstring& desc, bool applyColor = true);
 	wstring GetActionReplacement(int iPad, unsigned char ucAction);
 	wstring GetVKReplacement(unsigned int uiVKey);
 	wstring GetIconReplacement(unsigned int uiIcon);
@@ -707,6 +711,8 @@ private:
 	bool			m_bGameNewWorldSizeUseMoat;
 	unsigned int	m_GameNewHellScale;
 #endif
+	int64_t			m_seedOverride;
+	bool			m_hasSeedOverride;
 	unsigned int	FromBigEndian(unsigned int uiValue);
 
 public:
@@ -724,6 +730,10 @@ public:
 	void			SetGameNewHellScale(unsigned int newScale)				{ m_GameNewHellScale = newScale; }
 	unsigned int	GetGameNewHellScale()									{ return m_GameNewHellScale; }
 #endif
+	void			SetSeedOverride(int64_t seed)	{ m_seedOverride = seed; m_hasSeedOverride = true; }
+	bool			HasSeedOverride()				{ return m_hasSeedOverride; }
+	int64_t			GetSeedOverride()				{ return m_seedOverride; }
+
 	void			SetResetNether(bool bResetNether) {m_bResetNether=bResetNether;}
 	bool			GetResetNether() {return m_bResetNether;}
 	bool			CanRecordStatsAndAchievements();
@@ -810,6 +820,10 @@ public:
 	void SetCorruptSaveDeleted(bool bVal) {m_bCorruptSaveDeleted=bVal;}
 	bool GetCorruptSaveDeleted(void) {return m_bCorruptSaveDeleted;}
 
+	// 4J Added: Store save folder name for hardcore world deletion on Win64
+	void SetCurrentSaveFolderName(const wstring& name) { m_currentSaveFolderName = name; }
+	const wstring& GetCurrentSaveFolderName() const { return m_currentSaveFolderName; }
+
 	void EnterSaveNotificationSection();
 	void LeaveSaveNotificationSection();
 private:
@@ -831,6 +845,7 @@ private:
 	CRITICAL_SECTION csAdditionalSkinBoxes;
 	CRITICAL_SECTION csAnimOverrideBitmask;
 	bool m_bCorruptSaveDeleted;
+	wstring m_currentSaveFolderName; // 4J Added: for hardcore world deletion on Win64
 
 	DWORD m_dwAdditionalModelParts[XUSER_MAX_COUNT];
 

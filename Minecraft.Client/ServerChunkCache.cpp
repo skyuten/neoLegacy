@@ -80,54 +80,27 @@ vector<LevelChunk *> *ServerChunkCache::getLoadedChunkList()
 	return &m_loadedChunkList;
 }
 
-void ServerChunkCache::drop(int x, int z)
+void ServerChunkCache::drop(const int x, const int z)
 {
-	// 4J - we're not dropping things anymore now that we have a fixed sized cache
-#ifdef _LARGE_WORLDS
+	const int ix = x + XZOFFSET;
+	const int iz = z + XZOFFSET;
+	if ((ix < 0) || (ix >= XZSIZE)) return;
+	if ((iz < 0) || (iz >= XZSIZE)) return;
+	const int idx = ix * XZSIZE + iz;
+	LevelChunk* chunk = cache[idx];
 
-	bool canDrop = false;
-//	if (level->dimension->mayRespawn())
-//	{
-//		Pos *spawnPos = level->getSharedSpawnPos();
-//		int xd = x * 16 + 8 - spawnPos->x;
-//		int zd = z * 16 + 8 - spawnPos->z;
-//		delete spawnPos;
-//		int r = 128;
-//		if (xd < -r || xd > r || zd < -r || zd > r)
-//		{
-//			canDrop = true;
-//}
-//	}
-//	else
+	if (chunk != nullptr)
 	{
-		canDrop = true;
+		m_toDrop.push_back(chunk);
 	}
-	if(canDrop)
-	{
-		int ix = x + XZOFFSET;
-		int iz = z + XZOFFSET;
-		// Check we're in range of the stored level
-		if( ( ix < 0 ) || ( ix >= XZSIZE ) ) return;
-		if( ( iz < 0 ) || ( iz >= XZSIZE ) ) return;
-		int idx = ix * XZSIZE + iz;
-		LevelChunk *chunk = cache[idx];
-
-		if(chunk)
-		{
-			m_toDrop.push_back(chunk);
-		}
-	}
-#endif
 }
 
 void ServerChunkCache::dropAll()
 {
-#ifdef _LARGE_WORLDS
 	for (LevelChunk *chunk : m_loadedChunkList)
 	{
 		drop(chunk->x, chunk->z);
-}
-#endif
+	}
 }
 
 // 4J - this is the original (and virtual) interface to create
@@ -954,8 +927,13 @@ bool ServerChunkCache::tick()
 						int ix = chunk->x + XZOFFSET;
 						int iz = chunk->z + XZOFFSET;
 						int idx = ix * XZSIZE + iz;
+						delete m_unloadedCache[idx];
 						m_unloadedCache[idx] = chunk;
 						cache[idx] = nullptr;
+					}
+					else
+					{
+						continue;
 					}
 				}
 				m_toDrop.pop_front();

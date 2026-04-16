@@ -3,37 +3,41 @@
 #include "net.minecraft.world.level.tile.h"
 #include "net.minecraft.world.level.levelgen.feature.h"
 #include "net.minecraft.world.h"
+#include "Dimension.h"
 
 #include "Sapling.h"
 #include "SavannaTreeFeature.h"
 #include "RoofTreeFeature.h"
 #include "MegaPineTreeFeature.h"
 
-int Sapling::SAPLING_NAMES[SAPLING_NAMES_SIZE] = {    
+#if defined(_WINDOWS64)
+#include "../Minecraft.Server/FourKitBridge.h"
+#endif
+
+int Sapling::SAPLING_NAMES[SAPLING_NAMES_SIZE] = {
     IDS_TILE_SAPLING_OAK,
     IDS_TILE_SAPLING_SPRUCE,
     IDS_TILE_SAPLING_BIRCH,
     IDS_TILE_SAPLING_JUNGLE,
-    IDS_TILE_SAPLING_ACACIA, 
-    IDS_TILE_SAPLING_DARK_OAK 
+    IDS_TILE_SAPLING_ACACIA,
+    IDS_TILE_SAPLING_DARK_OAK
 };
 
 const wstring Sapling::TEXTURE_NAMES[] = {
-    L"sapling", 
-    L"sapling_spruce", 
-    L"sapling_birch", 
-    L"sapling_jungle", 
-    L"sapling_acacia", 
+    L"sapling",
+    L"sapling_spruce",
+    L"sapling_birch",
+    L"sapling_jungle",
+    L"sapling_acacia",
     L"sapling_dark_oak"
 };
 
-Sapling::Sapling(int id) : Bush( id )
+Sapling::Sapling(int id) : Bush(id)
 {
     this->updateDefaultShape();
     icons = nullptr;
 }
 
-// 4J Added override
 void Sapling::updateDefaultShape()
 {
     float ss = 0.4f;
@@ -50,7 +54,7 @@ void Sapling::tick(Level *level, int x, int y, int z, Random *random)
     {
         if (random->nextInt(7) == 0)
         {
-            advanceTree(level, x, y, z, random);
+            advanceTree(level, x, y, z, random, true, -1);
         }
     }
 }
@@ -62,25 +66,25 @@ Icon *Sapling::getTexture(int face, int data)
     return icons[data];
 }
 
-void Sapling::advanceTree(Level *level, int x, int y, int z, Random *random)
+void Sapling::advanceTree(Level* level, int x, int y, int z, Random* random, bool naturalGrowth, int entityId)
 {
     int data = level->getData(x, y, z);
+
     if ((data & AGE_BIT) == 0)
     {
         level->setData(x, y, z, data | AGE_BIT, Tile::UPDATE_NONE);
     }
     else
     {
-        growTree(level, x, y, z, random);
+        growTree(level, x, y, z, random, naturalGrowth, entityId);
     }
 }
 
-void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
+void Sapling::growTree(Level* level, int x, int y, int z, Random* random, bool naturalGrowth, int entityId)
 {
     int data = level->getData(x, y, z) & TYPE_MASK;
 
     Feature *f = nullptr;
-
     int ox = 0, oz = 0;
     bool multiblock = false;
 
@@ -90,9 +94,9 @@ void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
         {
             for (oz = 0; oz >= -1; oz--)
             {
-                if (isSapling(level, x + ox, y, z + oz, TYPE_EVERGREEN) && 
-                    isSapling(level, x + ox + 1, y, z + oz, TYPE_EVERGREEN) && 
-                    isSapling(level, x + ox, y, z + oz + 1, TYPE_EVERGREEN) && 
+                if (isSapling(level, x + ox, y, z + oz, TYPE_EVERGREEN) &&
+                    isSapling(level, x + ox + 1, y, z + oz, TYPE_EVERGREEN) &&
+                    isSapling(level, x + ox, y, z + oz + 1, TYPE_EVERGREEN) &&
                     isSapling(level, x + ox + 1, y, z + oz + 1, TYPE_EVERGREEN))
                 {
                     f = new MegaPineTreeFeature(true, random->nextBoolean());
@@ -100,9 +104,10 @@ void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
                     break;
                 }
             }
-            if (f != nullptr) break;
+            if (f) break;
         }
-        if (f == nullptr)
+
+        if (!f)
         {
             ox = oz = 0;
             f = new SpruceFeature(true);
@@ -118,9 +123,9 @@ void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
         {
             for (oz = 0; oz >= -1; oz--)
             {
-                if (isSapling(level, x + ox, y, z + oz, TYPE_JUNGLE) && 
-                    isSapling(level, x + ox + 1, y, z + oz, TYPE_JUNGLE) && 
-                    isSapling(level, x + ox, y, z + oz + 1, TYPE_JUNGLE) && 
+                if (isSapling(level, x + ox, y, z + oz, TYPE_JUNGLE) &&
+                    isSapling(level, x + ox + 1, y, z + oz, TYPE_JUNGLE) &&
+                    isSapling(level, x + ox, y, z + oz + 1, TYPE_JUNGLE) &&
                     isSapling(level, x + ox + 1, y, z + oz + 1, TYPE_JUNGLE))
                 {
                     f = new MegaTreeFeature(true, 10 + random->nextInt(20), TreeTile::JUNGLE_TRUNK, LeafTile::JUNGLE_LEAF);
@@ -128,12 +133,10 @@ void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
                     break;
                 }
             }
-            if (f != nullptr)
-            {
-                break;
-            }
+            if (f) break;
         }
-        if (f == nullptr)
+
+        if (!f)
         {
             ox = oz = 0;
             f = new TreeFeature(true, 4 + random->nextInt(7), TreeTile::JUNGLE_TRUNK, LeafTile::JUNGLE_LEAF, false);
@@ -141,7 +144,7 @@ void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
     }
     else if (data == TYPE_ACACIA)
     {
-        f = new SavannaTreeFeature(true); 
+        f = new SavannaTreeFeature(true);
     }
     else if (data == TYPE_DARK_OAK)
     {
@@ -149,9 +152,9 @@ void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
         {
             for (oz = 0; oz >= -1; oz--)
             {
-                if (isSapling(level, x + ox, y, z + oz, TYPE_DARK_OAK) && 
-                    isSapling(level, x + ox + 1, y, z + oz, TYPE_DARK_OAK) && 
-                    isSapling(level, x + ox, y, z + oz + 1, TYPE_DARK_OAK) && 
+                if (isSapling(level, x + ox, y, z + oz, TYPE_DARK_OAK) &&
+                    isSapling(level, x + ox + 1, y, z + oz, TYPE_DARK_OAK) &&
+                    isSapling(level, x + ox, y, z + oz + 1, TYPE_DARK_OAK) &&
                     isSapling(level, x + ox + 1, y, z + oz + 1, TYPE_DARK_OAK))
                 {
                     f = new RoofTreeFeature(true);
@@ -159,10 +162,10 @@ void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
                     break;
                 }
             }
-            if (f != nullptr) break;
+            if (f) break;
         }
-        
-        if (f == nullptr) return; 
+
+        if (!f) return;
     }
     else
     {
@@ -173,6 +176,20 @@ void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
             f = new BasicTree(true);
         }
     }
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+    int TreeType = data;
+    if (data != TYPE_EVERGREEN && data != TYPE_BIRCH && data != TYPE_JUNGLE)
+    {
+        TreeType = (dynamic_cast<BasicTree*>(f) != nullptr) ? 4 : 5;
+    }
+
+    if (FourKitBridge::FireStructureGrow(level->dimension->id, x, y, z, TreeType, !naturalGrowth, entityId))
+    {
+        delete f;
+        f = nullptr;
+    }
+#endif
 
     if (multiblock)
     {
@@ -186,7 +203,7 @@ void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
         level->setTileAndData(x, y, z, 0, 0, Tile::UPDATE_NONE);
     }
 
-    if (!f->place(level, random, x + ox, y, z + oz))
+    if (f == nullptr || !f->place(level, random, x + ox, y, z + oz))
     {
         if (multiblock)
         {
@@ -200,14 +217,13 @@ void Sapling::growTree(Level *level, int x, int y, int z, Random *random)
             level->setTileAndData(x, y, z, id, data, Tile::UPDATE_NONE);
         }
     }
-    
-    if( f != nullptr )
-        delete f;
+
+    if (f) delete f;
 }
 
-unsigned int Sapling::getDescriptionId(int iData )
+unsigned int Sapling::getDescriptionId(int iData)
 {
-    if(iData < 0 || iData >= SAPLING_NAMES_SIZE) iData = 0;
+    if (iData < 0 || iData >= SAPLING_NAMES_SIZE) iData = 0;
     return Sapling::SAPLING_NAMES[iData];
 }
 

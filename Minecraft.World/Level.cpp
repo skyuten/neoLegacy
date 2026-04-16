@@ -3687,13 +3687,11 @@ vector<shared_ptr<Entity> > *Level::getEntities(shared_ptr<Entity> except, AABB 
 	int zc0 = Mth::floor((bb->z0 - 2) / 16);
 	int zc1 = Mth::floor((bb->z1 + 2) / 16);
 
-#ifdef __PSVITA__
 #ifdef _ENTITIES_RW_SECTION
 	// AP - RW critical sections are expensive so enter it here so we only have to call it once instead of X times
 	EnterCriticalRWSection(&LevelChunk::m_csEntities, false);
 #else
 	EnterCriticalSection(&LevelChunk::m_csEntities);
-#endif
 #endif
 
 	for (int xc = xc0; xc <= xc1; xc++)
@@ -3706,12 +3704,10 @@ vector<shared_ptr<Entity> > *Level::getEntities(shared_ptr<Entity> except, AABB 
 		}
 		MemSect(0);
 
-#ifdef __PSVITA__
 #ifdef _ENTITIES_RW_SECTION
 		LeaveCriticalRWSection(&LevelChunk::m_csEntities, false);
 #else
 		LeaveCriticalSection(&LevelChunk::m_csEntities);
-#endif
 #endif
 
 		return &es;
@@ -3730,13 +3726,11 @@ vector<shared_ptr<Entity> > *Level::getEntitiesOfClass(const type_info& baseClas
 	int zc1 = Mth::floor((bb->z1 + 2) / 16);
 	vector<shared_ptr<Entity> > *es = new vector<shared_ptr<Entity> >();
 
-#ifdef __PSVITA__
 #ifdef _ENTITIES_RW_SECTION
 	// AP - RW critical sections are expensive so enter it here so we only have to call it once instead of X times
 	EnterCriticalRWSection(&LevelChunk::m_csEntities, false);
 #else
 	EnterCriticalSection(&LevelChunk::m_csEntities);
-#endif
 #endif
 
 	for (int xc = xc0; xc <= xc1; xc++)
@@ -3750,12 +3744,10 @@ vector<shared_ptr<Entity> > *Level::getEntitiesOfClass(const type_info& baseClas
 		}
 	}
 
-#ifdef __PSVITA__
 #ifdef _ENTITIES_RW_SECTION
 	LeaveCriticalRWSection(&LevelChunk::m_csEntities, false);
 #else
 	LeaveCriticalSection(&LevelChunk::m_csEntities);
-#endif
 #endif
 
 	return es;

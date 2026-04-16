@@ -26,6 +26,9 @@
 #include "../Minecraft.World/Socket.h"
 #include "../Minecraft.World/Achievements.h"
 #include "../Minecraft.World/net.minecraft.h"
+#include "../Minecraft.World/LevelData.h"
+#include "../Minecraft.World/Pos.h"
+#include "../Minecraft.World/Achievements.h"
 #include "EntityTracker.h"
 #include "ServerConnection.h"
 #include "../Minecraft.World/GenericStats.h"
@@ -37,6 +40,12 @@
 #include "Options.h"
 #if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
 #include "../Minecraft.Server/ServerLogManager.h"
+#include "../Minecraft.Server/Access/Access.h"
+#include "../Minecraft.Server/Security/IdentityTokenManager.h"
+#include "../Minecraft.Server/Security/SecurityConfig.h"
+#include "../Minecraft.Server/Security/ConnectionCipher.h"
+#include "../Minecraft.Server/FourKitBridge.h"
+extern bool g_Win64DedicatedServer;
 #endif
 
 namespace
@@ -63,6 +72,7 @@ PlayerConnection::PlayerConnection(MinecraftServer *server, Connection *connecti
 	aboveGroundTickCount = 0;
 	xLastOk = yLastOk = zLastOk = 0;
 	synched = true;
+	hasDoneFirstTickFourKit = false;
 	didTick = false;
 	lastKeepAliveId = 0;
 	lastKeepAliveTime = 0;
@@ -85,6 +95,9 @@ PlayerConnection::PlayerConnection(MinecraftServer *server, Connection *connecti
 	m_onlineXUID = INVALID_XUID;
 	m_bHasClientTickedOnce = false;
 	m_logSmallId = 0;
+	m_identityVerified = false;
+	m_identityChallengeTick = -1;
+	m_securityGateOpen = true; // default open; closed when cipher is required
 
 	// Cache the first valid transport smallId because disconnect teardown can clear it before the server logger runs.
 	if (this->connection != NULL && this->connection->getSocket() != NULL)
@@ -114,6 +127,14 @@ unsigned char PlayerConnection::getLogSmallId()
 
 void PlayerConnection::tick()
 {
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+    if (!hasDoneFirstTickFourKit)
+    {
+		FourKitBridge::FirePlayerJoin(player->entityId, player->name, player->getUUID(), (unsigned long long)player->getOnlineXuid(), (unsigned long long)player->getXuid());
+        hasDoneFirstTickFourKit = true;
+    }
+#endif
+
 	if( done ) return;
 
 	if( m_bCloseOnTick )
@@ -143,6 +164,14 @@ void PlayerConnection::tick()
 	{
 		dropSpamTickCount--;
 	}
+
+	// Ensure server-side player tick runs even when no move packet was received this tick.
+	// Without this, environmental damage (drowning, fire, lava) is never applied to clients
+	// that don't send frequent move packets.
+	if (!didTick && player != nullptr)
+	{
+		player->doTick(false);
+	}
 }
 
 void PlayerConnection::disconnect(DisconnectPacket::eDisconnectReason reason)
@@ -154,34 +183,39 @@ void PlayerConnection::disconnect(DisconnectPacket::eDisconnectReason reason)
 		return;
 	}
 
+	std::wstring kickLeaveMessage;
+	bool fourKitHandledQuit = false;
 #if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+	if (reason != DisconnectPacket::eDisconnect_Closed &&
+		reason != DisconnectPacket::eDisconnect_ConnectionCreationFailed &&
+		reason != DisconnectPacket::eDisconnect_Quitting)
+	{
+		if (FourKitBridge::FirePlayerKick(player->entityId, (int)reason, kickLeaveMessage))
+		{
+			m_bWasKicked.store(false);
+			LeaveCriticalSection(&done_cs);
+			return;
+		}
+	}
+
 	ServerRuntime::ServerLogManager::OnPlayerDisconnected(
 		getLogSmallId(),
 		(player != NULL) ? player->name : std::wstring(),
 		reason,
 		true);
+	fourKitHandledQuit = FourKitBridge::FirePlayerQuit(player->entityId);
 #endif
 	app.DebugPrintf("PlayerConnection disconect reason: %d\n", reason );
 	player->disconnect();
 
-	// 4J Stu - Need to remove the player from the receiving list before their socket is NULLed so that we can find another player on their system
-	server->getPlayers()->removePlayerFromReceiving( player );
-	send(std::make_shared<DisconnectPacket>(reason));
-	connection->sendAndQuit();
-	// 4J-PB - removed, since it needs to be localised in the language the client is in
-	//server->players->broadcastAll( shared_ptr<ChatPacket>( new ChatPacket(L"�e" + player->name + L" left the game.") ) );
-	if(getWasKicked())
-	{
-		server->getPlayers()->broadcastAll(std::make_shared<ChatPacket>(player->name, ChatPacket::e_ChatPlayerKickedFromGame));
-	}
-	else
-	{
-		server->getPlayers()->broadcastAll(std::make_shared<ChatPacket>(player->name, ChatPacket::e_ChatPlayerLeftGame));
-	}
-
-	server->getPlayers()->remove(player);
+	// Mark done and release the lock BEFORE the heavy PlayerList work.
+	// The actual removal, broadcast, and socket teardown are queued for
+	// the next tick, which processes them without holding done_cs.
 	done = true;
 	LeaveCriticalSection(&done_cs);
+
+	server->getPlayers()->queueDisconnect(player, static_cast<int>(reason),
+		kickLeaveMessage, getWasKicked(), fourKitHandledQuit);
 }
 
 void PlayerConnection::handlePlayerInput(shared_ptr<PlayerInputPacket> packet)
@@ -265,6 +299,8 @@ void PlayerConnection::handleMovePlayer(shared_ptr<MovePlayerPacket> packet)
 
 		float yRotT = player->yRot;
 		float xRotT = player->xRot;
+		const float yRotOld = yRotT;
+		const float xRotOld = xRotT;
 
 		if (packet->hasPos && packet->y == -999 && packet->yView == -999)
 		{
@@ -328,7 +364,33 @@ void PlayerConnection::handleMovePlayer(shared_ptr<MovePlayerPacket> packet)
 			return;
 		}
 
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		if (xLastOk != xt || yLastOk != yt || zLastOk != zt || yRotT != yRotOld || xRotT != xRotOld)
+		{
+			double moveToX, moveToY, moveToZ;
+			bool cancelled = FourKitBridge::FirePlayerMove(player->entityId,
+				xLastOk, yLastOk, zLastOk,
+				xt, yt, zt,
+				&moveToX, &moveToY, &moveToZ);
+			if (cancelled)
+			{
+				teleport(xLastOk, yLastOk, zLastOk, yRotT, xRotT);
+				return;
+			}
+			if (moveToX != xt || moveToY != yt || moveToZ != zt)
+			{
+				xt = moveToX;
+				yt = moveToY;
+				zt = moveToZ;
+				xDist = xt - player->x;
+				yDist = yt - player->y;
+				zDist = zt - player->z;
+			}
+		}
+#endif
+
 		float r = 1 / 16.0f;
+		if (player->bb == nullptr) return;
 		bool oldOk = level->getCubes(player, player->bb->copy()->shrink(r, r, r))->empty();
 
 		if (player->onGround && !packet->onGround && yDist > 0)
@@ -376,13 +438,19 @@ void PlayerConnection::handleMovePlayer(shared_ptr<MovePlayerPacket> packet)
 		}
 		player->absMoveTo(xt, yt, zt, yRotT, xRotT);
 
-		bool newOk = level->getCubes(player, player->bb->copy()->shrink(r, r, r))->empty();
+		AABB *playerBB = player->bb;
+		if (playerBB == nullptr)
+		{
+			teleport(xLastOk, yLastOk, zLastOk, yRotT, xRotT);
+			return;
+		}
+		bool newOk = level->getCubes(player, playerBB->copy()->shrink(r, r, r))->empty();
 		if (oldOk && (fail || !newOk) && !player->isSleeping())
 		{
 			teleport(xLastOk, yLastOk, zLastOk, yRotT, xRotT);
 			return;
 		}
-		AABB *testBox = player->bb->copy()->grow(r, r, r)->expand(0, -0.55, 0);
+		AABB *testBox = playerBB->copy()->grow(r, r, r)->expand(0, -0.55, 0);
 		// && server.level.getCubes(player, testBox).size() == 0
 		if (!server->isFlightAllowed() && !player->gameMode->isCreative() && !level->containsAnyBlocks(testBox) && !player->isAllowedToFly() )
 		{
@@ -434,11 +502,55 @@ void PlayerConnection::handlePlayerAction(shared_ptr<PlayerActionPacket> packet)
 
 	if (packet->action == PlayerActionPacket::DROP_ITEM)
 	{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		{
+			shared_ptr<ItemInstance> selected = player->inventory->getSelected();
+			if (selected != nullptr && selected->count > 0)
+			{
+				int outId = selected->id, outCount = 1, outAux = selected->getAuxValue();
+				bool cancelled = FourKitBridge::FirePlayerDropItem(
+					player->entityId, selected->id, 1, selected->getAuxValue(),
+					&outId, &outCount, &outAux);
+				if (cancelled)
+					return;
+				player->inventory->removeItem(player->inventory->selected, 1);
+				shared_ptr<ItemInstance> dropItem = (outId == selected->id)
+					? selected->copy()
+					: std::make_shared<ItemInstance>(outId, outCount, outAux);
+				dropItem->count = outCount;
+				if (outAux != selected->getAuxValue()) dropItem->setAuxValue(outAux);
+				player->drop(dropItem);
+				return;
+			}
+		}
+#endif
 		player->drop(false);
 		return;
 	}
 	else if (packet->action == PlayerActionPacket::DROP_ALL_ITEMS)
 	{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		{
+			shared_ptr<ItemInstance> selected = player->inventory->getSelected();
+			if (selected != nullptr && selected->count > 0)
+			{
+				int outId = selected->id, outCount = selected->count, outAux = selected->getAuxValue();
+				bool cancelled = FourKitBridge::FirePlayerDropItem(
+					player->entityId, selected->id, selected->count, selected->getAuxValue(),
+					&outId, &outCount, &outAux);
+				if (cancelled)
+					return;
+				player->inventory->removeItem(player->inventory->selected, selected->count);
+				shared_ptr<ItemInstance> dropItem = (outId == selected->id)
+					? selected->copy()
+					: std::make_shared<ItemInstance>(outId, outCount, outAux);
+				dropItem->count = outCount;
+				if (outAux != selected->getAuxValue()) dropItem->setAuxValue(outAux);
+				player->drop(dropItem);
+				return;
+			}
+		}
+#endif
 		player->drop(true);
 		return;
 	}
@@ -476,6 +588,23 @@ void PlayerConnection::handlePlayerAction(shared_ptr<PlayerActionPacket> packet)
 
 	if (packet->action == PlayerActionPacket::START_DESTROY_BLOCK)
 	{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		lastLeftClickTick = tickCount;
+		{
+			shared_ptr<ItemInstance> heldItem = player->inventory->getSelected();
+			int iId = heldItem ? heldItem->id : 0;
+			int iCount = heldItem ? heldItem->count : 0;
+			int iAux = heldItem ? heldItem->getAuxValue() : 0;
+			int useItemInHand = 1;
+			bool cancelled = FourKitBridge::FirePlayerInteract(
+				player->entityId, 1 /* LEFT_CLICK_BLOCK */,
+				iId, iCount, iAux,
+				x, y, z, packet->face, player->dimension,
+				&useItemInHand);
+			if (cancelled)
+				return;
+		}
+#endif
 		// Anti-cheat: validate spawn protection on the server for mining start.
 		if (!server->isUnderSpawnProtection(level, x, y, z, player)) player->gameMode->startDestroyBlock(x, y, z, packet->face);
 		else player->connection->send(std::make_shared<TileUpdatePacket>(x, y, z, level));
@@ -508,19 +637,128 @@ void PlayerConnection::handleUseItem(shared_ptr<UseItemPacket> packet)
 	if (packet->getFace() == 255)
 	{
 		if (item == nullptr) return;
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		{
+			int iId = item->id;
+			int iCount = item->count;
+			int iAux = item->getAuxValue();
+			int useItemInHand = 1;
+			bool cancelled = FourKitBridge::FirePlayerInteract(
+				player->entityId, 2,
+				iId, iCount, iAux,
+				0, 0, 0, 6, player->dimension,
+				&useItemInHand);
+			if (cancelled || !useItemInHand)
+				return;
+		}
+#endif
 		player->gameMode->useItem(player, level, item);
 	}
 	else if ((packet->getY() < server->getMaxBuildHeight() - 1) || (packet->getFace() != Facing::UP && packet->getY() < server->getMaxBuildHeight()))
 	{
 		if (synched && player->distanceToSqr(x + 0.5, y + 0.5, z + 0.5) < 8 * 8)
 		{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+			{
+				int iId = item ? item->id : 0;
+				int iCount = item ? item->count : 0;
+				int iAux = item ? item->getAuxValue() : 0;
+				int useItemInHand = 1;
+				bool cancelled = FourKitBridge::FirePlayerInteract(
+					player->entityId, 3 /* RIGHT_CLICK_BLOCK */,
+					iId, iCount, iAux,
+					x, y, z, face, player->dimension,
+					&useItemInHand);
+				if (cancelled || !useItemInHand)
+				{
+					informClient = true;
+					goto skipUseItemOn;
+				}
+			}
+#endif
 			// Anti-cheat: block placement/use must pass server-side spawn protection.
 			if (!server->isUnderSpawnProtection(level, x, y, z, player))
 			{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+				int placeX = x, placeY = y, placeZ = z;
+				bool validFace = true;
+
+				if      (face == 0) placeY--;
+				else if (face == 1) placeY++;
+				else if (face == 2) placeZ--;
+				else if (face == 3) placeZ++;
+				else if (face == 4) placeX--;
+				else if (face == 5) placeX++;
+				else                validFace = false;
+
+				int oldTileId      = validFace ? level->getTile(placeX, placeY, placeZ) : 0;
+				int oldTileData    = validFace ? level->getData(placeX, placeY, placeZ) : 0;
+				int oldClickedId   = level->getTile(x, y, z);
+				int oldClickedData = level->getData(x, y, z);
+				int savedItemId    = item ? item->id    : 0;
+				int savedItemCount = item ? item->count : 0;
+#endif
+
 				player->gameMode->useItemOn(player, level, item, x, y, z, face, packet->getClickX(), packet->getClickY(), packet->getClickZ());
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+				if (validFace)
+				{
+					int newTileId    = level->getTile(placeX, placeY, placeZ);
+					int newClickedId = level->getTile(x, y, z);
+
+					int fireX = placeX, fireY = placeY, fireZ = placeZ;
+					int againstX = x, againstY = y, againstZ = z;
+					int revertId = oldTileId, revertData = oldTileData;
+					bool shouldFire = false;
+
+					if (newTileId != 0 && newTileId != oldTileId)
+					{
+						shouldFire = true;
+					}
+					else if (newClickedId != 0 && newClickedId != oldClickedId)
+					{
+						shouldFire = true;
+						fireX = x; fireY = y; fireZ = z;
+						revertId = oldClickedId; revertData = oldClickedData;
+						againstX = x; againstY = y; againstZ = z;
+						if      (face == 0) againstY++;
+						else if (face == 1) againstY--;
+						else if (face == 2) againstZ++;
+						else if (face == 3) againstZ--;
+						else if (face == 4) againstX++;
+						else if (face == 5) againstX--;
+					}
+
+					if (shouldFire)
+					{
+						bool cancelled = FourKitBridge::FireBlockPlace(
+							player->entityId, player->dimension,
+							fireX, fireY, fireZ,
+							againstX, againstY, againstZ,
+							savedItemId, savedItemCount, true);
+
+						if (cancelled)
+						{
+							level->setTileAndData(fireX, fireY, fireZ, revertId, revertData, Tile::UPDATE_ALL);
+							auto &slot = player->inventory->items[player->inventory->selected];
+							if (slot != nullptr)
+							{
+								slot->count = savedItemCount;
+							}
+							else if (savedItemId > 0 && savedItemId < 256 && Tile::tiles[savedItemId] != nullptr && savedItemCount > 0)
+							{
+								slot = std::make_shared<ItemInstance>(Tile::tiles[savedItemId], savedItemCount);
+							}
+							informClient = true;
+						}
+					}
+				}
+#endif
 			}
 		}
 
+skipUseItemOn:
 		informClient = true;
 	}
 	else
@@ -589,27 +827,37 @@ void PlayerConnection::onDisconnect(DisconnectPacket::eDisconnectReason reason, 
 		LeaveCriticalSection(&done_cs);
 		return;
 	}
+	bool fourKitHandledQuit = false;
 #if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
 	ServerRuntime::ServerLogManager::OnPlayerDisconnected(
 		getLogSmallId(),
 		(player != NULL) ? player->name : std::wstring(),
 		reason,
 		false);
+	fourKitHandledQuit = FourKitBridge::FirePlayerQuit(player->entityId);
 #endif
-	//    logger.info(player.name + " lost connection: " + reason);
-	// 4J-PB - removed, since it needs to be localised in the language the client is in
-	//server->players->broadcastAll( shared_ptr<ChatPacket>( new ChatPacket(L"�e" + player->name + L" left the game.") ) );
-	if(getWasKicked())
-	{
-		server->getPlayers()->broadcastAll(std::make_shared<ChatPacket>(player->name, ChatPacket::e_ChatPlayerKickedFromGame));
-	}
-	else
-	{
-		server->getPlayers()->broadcastAll(std::make_shared<ChatPacket>(player->name, ChatPacket::e_ChatPlayerLeftGame));
-	}
-	server->getPlayers()->remove(player);
+
 	done = true;
 	LeaveCriticalSection(&done_cs);
+
+	server->getPlayers()->queueDisconnect(player, static_cast<int>(reason),
+		L"", getWasKicked(), fourKitHandledQuit);
+}
+
+void PlayerConnection::openSecurityGate()
+{
+	if (m_securityGateOpen)
+		return;
+
+	m_securityGateOpen = true;
+
+	// Flush all buffered packets now that the cipher is active
+	for (auto &buffered : m_securityBuffer)
+	{
+		send(buffered);
+	}
+	m_securityBuffer.clear();
+	m_securityBuffer.shrink_to_fit();
 }
 
 void PlayerConnection::onUnhandledPacket(shared_ptr<Packet> packet)
@@ -622,6 +870,39 @@ void PlayerConnection::send(shared_ptr<Packet> packet)
 {
 	if( connection->getSocket() != nullptr )
 	{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		// Security gate: when require-secure-client is enabled, buffer ALL outgoing
+		// packets until the cipher handshake completes. Only the cipher handshake
+		// CustomPayloadPacket (MC|CKey) is sent immediately. Once the cipher activates,
+		// openSecurityGate() flushes the buffer. This prevents unsecured/old clients
+		// from receiving any game data (PlayerInfoPackets, XUIDs, etc.) before being kicked.
+		if (!m_securityGateOpen)
+		{
+			// Allow cipher handshake packets through immediately
+			if (packet->getId() == 250)
+			{
+				auto cpp = dynamic_pointer_cast<CustomPayloadPacket>(packet);
+				if (cpp != nullptr &&
+					(cpp->identifier == CustomPayloadPacket::CIPHER_KEY_CHANNEL ||
+					 cpp->identifier == CustomPayloadPacket::CIPHER_ACK_CHANNEL ||
+					 cpp->identifier == CustomPayloadPacket::CIPHER_ON_CHANNEL))
+				{
+					// Fall through to send
+				}
+				else
+				{
+					m_securityBuffer.push_back(packet);
+					return;
+				}
+			}
+			else
+			{
+				m_securityBuffer.push_back(packet);
+				return;
+			}
+		}
+#endif
+
 		if( !server->getPlayers()->canReceiveAllPackets( player ) )
 		{
 			// Check if we are allowed to send this packet type
@@ -679,8 +960,20 @@ void PlayerConnection::handleChat(shared_ptr<ChatPacket> packet)
 		handleCommand(message);
 		return;
 	}
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+	{
+		std::wstring formatted;
+        if (!FourKitBridge::FirePlayerChat(player->entityId, message, formatted))
+		{
+			if (formatted.empty())
+				formatted = L"<" + player->name + L"> " + message;
+			server->getPlayers()->broadcastAll(std::make_shared<ChatPacket>(formatted));
+		}
+	}
+#else
 	wstring formatted = L"<" + player->name + L"> " + message;
-	server->getPlayers()->broadcastAll(shared_ptr<ChatPacket>(new ChatPacket(formatted)));
+	server->getPlayers()->broadcastAll(shared_ptr<ChatPacket>(new ChatPacket(app.FormatChatMessage(formatted, false))));
+#endif
 	chatSpamTickCount += SharedConstants::TICKS_PER_SECOND;
 	if (chatSpamTickCount > SharedConstants::TICKS_PER_SECOND * 10)
 	{
@@ -690,6 +983,13 @@ void PlayerConnection::handleChat(shared_ptr<ChatPacket> packet)
 
 void PlayerConnection::handleCommand(const wstring& message)
 {
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+	std::wstring commandLine = message;
+	if (FourKitBridge::FireCommandPreprocess(player->entityId, commandLine, commandLine))
+		return;
+	if (FourKitBridge::HandlePlayerCommand(player->entityId, commandLine))
+		return;
+#endif
 	// 4J - TODO
 #if 0
 	server.getCommandDispatcher().performCommand(player, message);
@@ -701,6 +1001,23 @@ void PlayerConnection::handleAnimate(shared_ptr<AnimatePacket> packet)
 	player->resetLastActionTime();
 	if (packet->action == AnimatePacket::SWING)
 	{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		if (lastLeftClickTick != tickCount)
+		{
+			int useItemInHand = 1;
+			auto item = player->inventory->getSelected();
+			int iId = item ? item->id : 0;
+			int iCount = item ? item->count : 0;
+			int iAux = item ? item->getAuxValue() : 0;
+			bool cancelled = FourKitBridge::FirePlayerInteract(
+				player->entityId, 0,
+				iId, iCount, iAux,
+				0, 0, 0, 6, player->dimension,
+				&useItemInHand);
+			if (cancelled)
+				return;
+		}
+#endif
 		player->swing();
 	}
 }
@@ -811,15 +1128,34 @@ void PlayerConnection::handleInteract(shared_ptr<InteractPacket> packet)
 
 		if (packet->action == InteractPacket::INTERACT)
 		{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+			{
+				int mappedType = FourKitBridge::MapEntityType((int)target->GetType());
+				float targetHealth = 0, targetMaxHealth = 0, targetEyeHeight = 0;
+				auto living = dynamic_pointer_cast<LivingEntity>(target);
+				if (living)
+				{
+					targetHealth = living->getHealth();
+					targetMaxHealth = living->getMaxHealth();
+					targetEyeHeight = living->getHeadHeight();
+				}
+				if (FourKitBridge::FirePlayerInteractEntity(
+					player->entityId, target->entityId, mappedType,
+					player->dimension, target->x, target->y, target->z,
+					targetHealth, targetMaxHealth, targetEyeHeight))
+					return;
+			}
+#endif
 			player->interact(target);
 		}
 		else if (packet->action == InteractPacket::ATTACK)
 		{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+			lastLeftClickTick = tickCount;
+#endif
 			if ((target->GetType() == eTYPE_ITEMENTITY) || (target->GetType() == eTYPE_EXPERIENCEORB) || (target->GetType() == eTYPE_ARROW) || target == player)
 			{
-				//disconnect("Attempting to attack an invalid entity");
-				//server.warn("Player " + player.getName() + " tried to attack an invalid entity");
-				return;
+					return;
 			}
 			player->attack(target);
 		}
@@ -1064,10 +1400,19 @@ void PlayerConnection::handleServerSettingsChanged(shared_ptr<ServerSettingsChan
 {
 	if(packet->action==ServerSettingsChangedPacket::HOST_IN_GAME_SETTINGS)
 	{
-		// Need to check that this player has permission to change each individual setting?
-
 		INetworkPlayer *networkPlayer = getNetworkPlayer();
-		if( (networkPlayer != nullptr && networkPlayer->IsHost()) || player->isModerator())
+		bool isHost = (networkPlayer != nullptr && networkPlayer->IsHost());
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		// On dedicated servers, only the host can change server settings.
+		// Moderators (OPs) should not be able to alter game rules.
+		if (!isHost)
+		{
+			app.DebugPrintf("SECURITY: Non-host player %ls attempted to change server settings\n",
+				player->getName().c_str());
+			return;
+		}
+#endif
+		if( isHost || player->isModerator())
 		{
 			app.SetGameHostOption(eGameHostOption_FireSpreads, app.GetGameHostOption(packet->data,eGameHostOption_FireSpreads));
 			app.SetGameHostOption(eGameHostOption_TNT, app.GetGameHostOption(packet->data,eGameHostOption_TNT));
@@ -1090,14 +1435,81 @@ void PlayerConnection::handleServerSettingsChanged(shared_ptr<ServerSettingsChan
 void PlayerConnection::handleKickPlayer(shared_ptr<KickPlayerPacket> packet)
 {
 	INetworkPlayer *networkPlayer = getNetworkPlayer();
-	if( (networkPlayer != nullptr && networkPlayer->IsHost()) || player->isModerator())
+	bool isHost = (networkPlayer != nullptr && networkPlayer->IsHost());
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+	// Live ops.json check for non-host players
+	if (!isHost)
 	{
+		PlayerUID kickerXuid = m_offlineXUID;
+		if (kickerXuid == INVALID_XUID) kickerXuid = m_onlineXUID;
+		if (!ServerRuntime::Access::IsPlayerOp(kickerXuid))
+		{
+			app.DebugPrintf("SECURITY: Non-OP player %ls attempted to kick\n", player->getName().c_str());
+			{
+				INetworkPlayer *npLog = getNetworkPlayer();
+				if (npLog != nullptr)
+					ServerRuntime::ServerLogManager::OnUnauthorizedCommand(npLog->GetSmallId(), player->getName(), "kick");
+			}
+			return;
+		}
+	}
+#endif
+	if( isHost || player->isModerator())
+	{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		// On dedicated servers, non-host moderators cannot kick other moderators or the host.
+		if (!isHost)
+		{
+			for (auto &checkingPlayer : server->getPlayers()->players)
+			{
+				if (checkingPlayer != nullptr &&
+					checkingPlayer->connection->getNetworkPlayer() != nullptr &&
+					checkingPlayer->connection->getNetworkPlayer()->GetSmallId() == packet->m_networkSmallId)
+				{
+					if (checkingPlayer->isModerator() ||
+						checkingPlayer->connection->getNetworkPlayer()->IsHost())
+					{
+						app.DebugPrintf("SECURITY: Moderator %ls tried to kick host/moderator %ls\n",
+							player->getName().c_str(), checkingPlayer->getName().c_str());
+						return;
+					}
+					break;
+				}
+			}
+		}
+		app.DebugPrintf("CMD: Player %ls kicked player with smallId=%d\n",
+			player->getName().c_str(), packet->m_networkSmallId);
+#endif
 		server->getPlayers()->kickPlayerByShortId(packet->m_networkSmallId);
 	}
 }
 
 void PlayerConnection::handleGameCommand(shared_ptr<GameCommandPacket> packet)
 {
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+	INetworkPlayer *networkPlayer = getNetworkPlayer();
+	bool isHost = (networkPlayer != nullptr && networkPlayer->IsHost());
+	if (!isHost)
+	{
+		// Live ops.json check - in-memory isModerator() can be stale if ops.json was edited mid-session
+		PlayerUID cmdXuid = m_offlineXUID;
+		if (cmdXuid == INVALID_XUID) cmdXuid = m_onlineXUID;
+		if (!ServerRuntime::Access::IsPlayerOp(cmdXuid))
+		{
+			app.DebugPrintf("SECURITY: Non-OP player %ls attempted server command id=%d\n",
+				player->getName().c_str(), static_cast<int>(packet->command));
+			{
+				INetworkPlayer *npLog = getNetworkPlayer();
+				if (npLog != nullptr)
+					ServerRuntime::ServerLogManager::OnUnauthorizedCommand(npLog->GetSmallId(), player->getName(), "game-command");
+			}
+			return;
+		}
+	}
+	app.DebugPrintf("CMD: Player %ls (OP=%d, Host=%d) executed command id=%d\n",
+		player->getName().c_str(), player->isModerator() ? 1 : 0, isHost ? 1 : 0,
+		static_cast<int>(packet->command));
+#endif
 	MinecraftServer::getInstance()->getCommandDispatcher()->performCommand(player, packet->command, packet->data);
 }
 
@@ -1108,28 +1520,30 @@ void PlayerConnection::handleClientCommand(shared_ptr<ClientCommandPacket> packe
 	{
 		if (player->wonGame)
 		{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+			int oldEntityId = player->entityId;
+#endif
 			player = server->getPlayers()->respawn(player, player->m_enteredEndExitPortal?0:player->dimension, true);
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+			FourKitBridge::UpdatePlayerEntityId(oldEntityId, player->entityId);
+#endif
 		}
-		//else if (player.getLevel().getLevelData().isHardcore())
-		//{
-		//	if (server.isSingleplayer() && player.name.equals(server.getSingleplayerName()))
-		//	{
-		//		player.connection.disconnect("You have died. Game over, man, it's game over!");
-		//		server.selfDestruct();
-		//	}
-		//	else
-		//	{
-		//		BanEntry ban = new BanEntry(player.name);
-		//		ban.setReason("Death in Hardcore");
-
-		//		server.getPlayers().getBans().add(ban);
-		//		player.connection.disconnect("You have died. Game over, man, it's game over!");
-		//	}
-		//}
+		else if (player->level->getLevelData()->isHardcore())
+		{
+			// Hardcore mode — server rejects respawn. Ban and disconnect are already
+			// handled in ServerPlayer::die() via banPlayerForHardcoreDeath().
+			return;
+		}
 		else
 		{
 			if (player->getHealth() > 0) return;
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+			int oldEntityId = player->entityId;
+#endif
 			player = server->getPlayers()->respawn(player, 0, false);
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+			FourKitBridge::UpdatePlayerEntityId(oldEntityId, player->entityId);
+#endif
 		}
 	}
 }
@@ -1189,6 +1603,20 @@ void PlayerConnection::handleContainerClick(shared_ptr<ContainerClickPacket> pac
 	player->resetLastActionTime();
 	if (player->containerMenu->containerId == packet->containerId && player->containerMenu->isSynched(player))
 	{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		int fourKitClickResult = FourKitBridge::FireInventoryClick(player->entityId, packet->slotNum, packet->buttonNum, packet->clickType);
+		if (fourKitClickResult == 1)
+		{
+			expectedAcks[player->containerMenu->containerId] = packet->uid;
+			player->connection->send(std::make_shared<ContainerAckPacket>(packet->containerId, packet->uid, false));
+			player->containerMenu->setSynched(player, false);
+			vector<shared_ptr<ItemInstance>> items;
+			for (unsigned int i = 0; i < player->containerMenu->slots.size(); i++)
+				items.push_back(player->containerMenu->slots.at(i)->getItem());
+			player->refreshContainer(player->containerMenu, &items);
+			return;
+		}
+#endif
 		shared_ptr<ItemInstance> clicked = player->containerMenu->clicked(packet->slotNum, packet->buttonNum, packet->clickType, player);
 
 		if (ItemInstance::matches(packet->item, clicked))
@@ -1216,6 +1644,15 @@ void PlayerConnection::handleContainerClick(shared_ptr<ContainerClickPacket> pac
 
 			//                player.containerMenu.broadcastChanges();
 		}
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		if (fourKitClickResult == 2)
+		{
+			vector<shared_ptr<ItemInstance>> refreshItems;
+			for (unsigned int i = 0; i < player->containerMenu->slots.size(); i++)
+				refreshItems.push_back(player->containerMenu->slots.at(i)->getItem());
+			player->refreshContainer(player->containerMenu, &refreshItems);
+		}
+#endif
 	}
 
 }
@@ -1353,10 +1790,31 @@ void PlayerConnection::handleSignUpdate(shared_ptr<SignUpdatePacket> packet)
 			int y = packet->y;
 			int z = packet->z;
 			shared_ptr<SignTileEntity> ste = dynamic_pointer_cast<SignTileEntity>(te);
+
+			wstring lines[4];
 			for (int i = 0; i < 4; i++)
 			{
-				wstring lineText = packet->lines[i].substr(0,15);
-				ste->SetMessage( i, lineText );
+				lines[i] = packet->lines[i].substr(0,15);
+			}
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+			{
+				std::wstring outLines[4];
+				bool cancelled = FourKitBridge::FireSignChange(
+					player->entityId, player->dimension,
+					x, y, z,
+					lines[0], lines[1], lines[2], lines[3],
+					outLines);
+				if (cancelled)
+					return;
+				for (int i = 0; i < 4; i++)
+					lines[i] = outLines[i];
+			}
+#endif
+
+			for (int i = 0; i < 4; i++)
+			{
+				ste->SetMessage( i, lines[i] );
 			}
 			ste->SetVerified(false);
 			ste->setChanged();
@@ -1377,10 +1835,21 @@ void PlayerConnection::handleKeepAlive(shared_ptr<KeepAlivePacket> packet)
 
 void PlayerConnection::handlePlayerInfo(shared_ptr<PlayerInfoPacket> packet)
 {
-	// Need to check that this player has permission to change each individual setting?
-
 	INetworkPlayer *networkPlayer = getNetworkPlayer();
-	if( (networkPlayer != nullptr && networkPlayer->IsHost()) || player->isModerator() )
+	bool isHost = (networkPlayer != nullptr && networkPlayer->IsHost());
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+	// Live ops.json check for non-host players
+	if (!isHost)
+	{
+		PlayerUID infoXuid = m_offlineXUID;
+		if (infoXuid == INVALID_XUID) infoXuid = m_onlineXUID;
+		if (!ServerRuntime::Access::IsPlayerOp(infoXuid))
+		{
+			return;
+		}
+	}
+#endif
+	if( isHost || player->isModerator() )
 	{
 		shared_ptr<ServerPlayer> serverPlayer;
 		// Find the player being edited
@@ -1458,7 +1927,24 @@ void PlayerConnection::handlePlayerInfo(shared_ptr<PlayerInfoPacket> packet)
 						serverPlayer->setPlayerGamePrivilege(Player::ePlayerGamePrivilege_CanToggleClassicHunger,Player::getPlayerGamePrivilege(packet->m_playerPrivileges,Player::ePlayerGamePrivilege_CanToggleClassicHunger) );
 						serverPlayer->setPlayerGamePrivilege(Player::ePlayerGamePrivilege_CanTeleport,Player::getPlayerGamePrivilege(packet->m_playerPrivileges,Player::ePlayerGamePrivilege_CanTeleport) );
 					}
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+					// On dedicated servers, OP can only be granted/revoked if the target is in ops.json.
+					// This prevents runtime OP escalation via crafted PlayerInfoPackets.
+					bool wantsOp = Player::getPlayerGamePrivilege(packet->m_playerPrivileges, Player::ePlayerGamePrivilege_Op) != 0;
+					PlayerUID targetXuid = serverPlayer->connection->m_offlineXUID;
+					if (targetXuid == INVALID_XUID) targetXuid = serverPlayer->connection->m_onlineXUID;
+					if (wantsOp && !ServerRuntime::Access::IsPlayerOp(targetXuid))
+					{
+						app.DebugPrintf("SECURITY: Host tried to OP player %ls who is not in ops.json\n",
+							serverPlayer->getName().c_str());
+					}
+					else
+					{
+						serverPlayer->setPlayerGamePrivilege(Player::ePlayerGamePrivilege_Op, wantsOp ? 1u : 0u);
+					}
+#else
 					serverPlayer->setPlayerGamePrivilege(Player::ePlayerGamePrivilege_Op,Player::getPlayerGamePrivilege(packet->m_playerPrivileges,Player::ePlayerGamePrivilege_Op) );
+#endif
 				}
 			}
 
@@ -1496,6 +1982,44 @@ void PlayerConnection::handlePlayerAbilities(shared_ptr<PlayerAbilitiesPacket> p
 
 void PlayerConnection::handleCustomPayload(shared_ptr<CustomPayloadPacket> customPayloadPacket)
 {
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+	// Identity token response from client
+	if (CustomPayloadPacket::IDENTITY_TOKEN_RESPONSE.compare(customPayloadPacket->identifier) == 0)
+	{
+		PlayerUID xuid = m_offlineXUID;
+		if (xuid == INVALID_XUID) xuid = m_onlineXUID;
+
+		bool tokenValid = false;
+		if (customPayloadPacket->length == ServerRuntime::Security::IdentityTokenManager::TOKEN_SIZE &&
+			customPayloadPacket->data.length == ServerRuntime::Security::IdentityTokenManager::TOKEN_SIZE &&
+			customPayloadPacket->data.data != nullptr)
+		{
+			tokenValid = ServerRuntime::Security::GetIdentityTokenManager().VerifyToken(xuid, customPayloadPacket->data.data);
+		}
+
+		if (tokenValid)
+		{
+			m_identityVerified = true;
+			app.DebugPrintf("SECURITY: Identity token verified for player %ls\n", player->getName().c_str());
+			INetworkPlayer *npLog = getNetworkPlayer();
+			if (npLog != nullptr)
+				ServerRuntime::ServerLogManager::OnIdentityTokenVerified(npLog->GetSmallId());
+		}
+		else
+		{
+			app.DebugPrintf("SECURITY: Identity token MISMATCH for player %ls - will disconnect\n", player->getName().c_str());
+			app.DebugPrintf("SECURITY: If this player lost their token, use: revoketoken %ls\n", player->getName().c_str());
+			INetworkPlayer *npLog = getNetworkPlayer();
+			if (npLog != nullptr)
+				ServerRuntime::ServerLogManager::OnIdentityTokenMismatch(npLog->GetSmallId(), player->getName());
+			// Defer disconnect to avoid re-entrancy issues during packet dispatch
+			setWasKicked();
+			closeOnTick();
+		}
+		return;
+	}
+#endif
+
 	if (CustomPayloadPacket::CUSTOM_BOOK_PACKET.compare(customPayloadPacket->identifier) == 0)
 	{
 		ByteArrayInputStream bais(customPayloadPacket->data);
@@ -1579,45 +2103,58 @@ void PlayerConnection::handleCustomPayload(shared_ptr<CustomPayloadPacket> custo
 	}
 	else if (CustomPayloadPacket::SET_BEACON_PACKET.compare(customPayloadPacket->identifier) == 0)
 	{
-		if ( dynamic_cast<BeaconMenu *>( player->containerMenu) != nullptr)
-		{
-			ByteArrayInputStream bais(customPayloadPacket->data);
-			DataInputStream input(&bais);
-			int primary = input.readInt();
-			int secondary = input.readInt();
+	    if (dynamic_cast<BeaconMenu *>(player->containerMenu) != nullptr)
+	    {
+	        ByteArrayInputStream bais(customPayloadPacket->data);
+	        DataInputStream input(&bais);
+	        int primary = input.readInt();
+	        int secondary = input.readInt();
 
-			BeaconMenu *beaconMenu = static_cast<BeaconMenu *>(player->containerMenu);
-			Slot *slot = beaconMenu->getSlot(0);
-			if (slot->hasItem())
-			{
-				slot->remove(1);
-				shared_ptr<BeaconTileEntity> beacon = beaconMenu->getBeacon();
-				beacon->setPrimaryPower(primary);
-				beacon->setSecondaryPower(secondary);
-				beacon->setChanged();
-			}
-		}
+	        BeaconMenu *beaconMenu = static_cast<BeaconMenu *>(player->containerMenu);
+	        Slot *slot = beaconMenu->getSlot(0);
+
+	        if (slot != nullptr && slot->hasItem())
+	        {
+	            shared_ptr<BeaconTileEntity> beacon = beaconMenu->getBeacon();
+
+	            int prevPrimary = beacon->getPrimaryPower();
+	            int prevSecondary = beacon->getSecondaryPower();
+
+	            beacon->setPrimaryPower(primary);
+	            beacon->setSecondaryPower(secondary);
+
+	            // Only consume the payment item if the powers actually changed
+	            if (beacon->getPrimaryPower() != prevPrimary ||
+                    beacon->getSecondaryPower() != prevSecondary)
+	            {
+	                slot->remove(1);
+	            }
+
+	            beacon->setChanged();
+	        }
+	    }
 	}
 	else if (CustomPayloadPacket::SET_ITEM_NAME_PACKET.compare(customPayloadPacket->identifier) == 0)
 	{
-		AnvilMenu *menu = dynamic_cast<AnvilMenu *>( player->containerMenu);
-		if (menu)
-		{
-			if (customPayloadPacket->data.data == nullptr || customPayloadPacket->data.length < 1)
-			{
-				menu->setItemName(L"");
-			}
-			else
-			{
-				ByteArrayInputStream bais(customPayloadPacket->data);
-				DataInputStream dis(&bais);
-				wstring name = dis.readUTF();
-				if (name.length() <= 30)
-				{
-					menu->setItemName(name);
-				}
-			}
-		}
+	    AnvilMenu *menu = dynamic_cast<AnvilMenu *>(player->containerMenu);
+	    if (menu)
+	    {
+	        if (customPayloadPacket->data.data == nullptr || customPayloadPacket->data.length < 1)
+	        {
+	            menu->setItemName(L"");
+	        }
+	        else
+	        {
+	            ByteArrayInputStream bais(customPayloadPacket->data);
+	            DataInputStream dis(&bais);
+	            wstring name = dis.readUTF();
+
+	            if (name.length() <= 30)
+	            {
+	                menu->setItemName(name);
+	            }
+	        }
+	    }
 	}
 }
 

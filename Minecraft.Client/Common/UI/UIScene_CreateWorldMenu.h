@@ -74,6 +74,7 @@ protected:
 	
 	virtual void handleTimerComplete(int id);
 	virtual void handleGainFocus(bool navBack);
+    virtual bool canMoveSlider(F64 sliderId);
 
 public:
 	// INPUT

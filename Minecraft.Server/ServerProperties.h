@@ -31,6 +31,9 @@ namespace ServerRuntime
 		bool hasSeed;
 		/** `level-seed` */
 		__int64 seed;
+		/** `override-seed` replaces the seed for biome generation on existing worlds */
+		bool hasOverrideSeed;
+		__int64 overrideSeed;
 		/** `log-level` */
 		EServerLogLevel logLevel;
 		/** `autosave-interval` (seconds) */
@@ -73,6 +76,27 @@ namespace ServerRuntime
 		bool doTileDrops;
 		bool naturalRegeneration;
 		bool doDaylightCycle;
+		bool hardcore;
+		/** `hardcore-ban-ip` — whether hardcore death bans include IP bans */
+		bool hardcoreBanIp;
+
+		/** security settings */
+		/** `hide-player-list-prelogin` — strip XUIDs from PreLoginPacket response */
+		bool hidePlayerListPreLogin;
+		/** `rate-limit-connections-per-window` — max TCP connections per IP within the rate limit window */
+		int rateLimitConnectionsPerWindow;
+		/** `rate-limit-window-seconds` — sliding window duration for connection rate limiting */
+		int rateLimitWindowSeconds;
+		/** `max-pending-connections` — max simultaneous pending (pre-login) connections */
+		int maxPendingConnections;
+		/** `require-challenge-token` — reserved for future protocol extension (not yet enforced) */
+		bool requireChallengeToken;
+		/** `enable-stream-cipher` — enable XOR stream cipher for traffic obfuscation */
+		bool enableStreamCipher;
+		/** `require-secure-client` — kick clients that do not complete the cipher handshake */
+		bool requireSecureClient;
+		/** `proxy-protocol` — parse PROXY protocol v1 headers from TCP tunnel (e.g. playit.gg) */
+		bool proxyProtocol;
 
 		/** other MinecraftServer runtime settings */
 		int maxBuildHeight;

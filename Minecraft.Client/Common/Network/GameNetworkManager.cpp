@@ -204,6 +204,12 @@ bool	CGameNetworkManager::StartNetworkGame(Minecraft *minecraft, LPVOID lpParame
 	ProfileManager.SetDeferredSignoutEnabled(true);
 #endif
 
+	// Clear any stale cancel flag latched by the previous join's progress
+	// UI teardown, otherwise the next join's first tick insta-closes.
+	EnterCriticalSection(&bCancelRequestedCS);
+	g_NetworkManager.m_bCancelRequested = false;
+	LeaveCriticalSection(&bCancelRequestedCS);
+
     int64_t seed = 0;
 	bool dedicatedNoLocalHostPlayer = false;
     if (lpParameter != nullptr)
@@ -574,11 +580,10 @@ bool	CGameNetworkManager::StartNetworkGame(Minecraft *minecraft, LPVOID lpParame
 		}
 		else if ( connection->isClosed() || !IsInSession())
 		{
-//		assert(false);
-		// Set to NULL because we're returning to home
-		// The level is not reset when you leave the progress UI which causes a crash
-		Minecraft::GetInstance()->setLevel(NULL);
-
+//		    assert(false);
+		    // Set to NULL because we're returning to home
+		    // The level is not reset when you leave the progress UI which causes a crash
+		    Minecraft::GetInstance()->setLevel(NULL);
 			MinecraftServer::HaltServer();
 			return false;
 		}
@@ -801,6 +806,9 @@ void CGameNetworkManager::CancelJoinGame(LPVOID lpParam)
 	LeaveCriticalSection(&bCancelRequestedCS);
 #ifdef _XBOX_ONE
 	s_pPlatformNetworkManager->CancelJoinGame();
+#endif
+#ifdef _WINDOWS64
+	WinsockNetLayer::CancelJoinGame();
 #endif
 }
 

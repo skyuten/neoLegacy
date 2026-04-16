@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "HumanoidModel.h"
-#include "..\Minecraft.World\Mth.h"
-#include "..\Minecraft.World\Entity.h"
+#include "../Minecraft.World/Mth.h"
+#include "../Minecraft.World/Entity.h"
 #include "ModelPart.h"
 
 // 4J added 
@@ -442,7 +442,7 @@ void HumanoidModel::setupAnim(float time, float r, float bob, float yRot, float 
 
 		if (riding)
 		{
-			if(uiBitmaskOverrideAnim&(1<<eAnim_SmallModel) == 0)
+			if ((uiBitmaskOverrideAnim&(1<<eAnim_SmallModel)) == 0)
 			{
 				arm0->xRot += -HALF_PI * 0.4f;
 				arm1->xRot += -HALF_PI * 0.4f;

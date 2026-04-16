@@ -134,7 +134,14 @@ void CPlatformNetworkManagerStub::NotifyPlayerLeaving(IQNetPlayer* pQNetPlayer)
 	if (socket != nullptr)
 	{
 		if (m_pIQNet->IsHost())
+		{
 			g_NetworkManager.CloseConnection(networkPlayer);
+
+			// Propagate the TCP drop to the game Socket so any orphaned
+			// PendingConnection at this smallId cleans up before its login
+			// timer fires and leaks a DisconnectPacket to the reused slot.
+			socket->close(true);
+		}
 	}
 
 	if (m_pIQNet->IsHost())
@@ -288,6 +295,8 @@ void CPlatformNetworkManagerStub::DoWork()
 		}
 	}
 
+	// Async join finalization: when the background thread reports success,
+	// register players and transition the session to starting state.
 	if (m_bJoinPending)
 	{
 		WinsockNetLayer::eJoinState state = WinsockNetLayer::GetJoinState();
@@ -548,6 +557,7 @@ int CPlatformNetworkManagerStub::JoinGame(FriendSessionInfo* searchResult, int l
 	IQNet::m_player[0].m_smallId = 0;
 	IQNet::m_player[0].m_isRemote = true;
 	IQNet::m_player[0].m_isHostPlayer = true;
+	// Remote host still maps to legacy host XUID in mixed old/new sessions.
 	IQNet::m_player[0].m_resolvedXuid = Win64Xuid::GetLegacyEmbeddedHostXuid();
 	wcsncpy_s(IQNet::m_player[0].m_gamertag, 32, searchResult->data.hostName, _TRUNCATE);
 
@@ -558,7 +568,7 @@ int CPlatformNetworkManagerStub::JoinGame(FriendSessionInfo* searchResult, int l
 
 	if (!WinsockNetLayer::BeginJoinGame(hostIP, hostPort))
 	{
-		app.DebugPrintf("Win64 LAN: Failed to connect to %s:%d\n", hostIP, hostPort);
+		app.DebugPrintf("Win64 LAN: Failed to start async join to %s:%d\n", hostIP, hostPort);
 		return CGameNetworkManager::JOINGAME_FAIL_GENERAL;
 	}
 
@@ -978,6 +988,13 @@ void CPlatformNetworkManagerStub::ForceFriendsSessionRefresh()
 		delete m_pSearchResults[i];
 		m_pSearchResults[i] = nullptr;
 	}
+
+#ifdef _WINDOWS64
+	// Immediately rebuild the session list from servers.db so that
+	// edits/deletions are visible as soon as the UI regains focus,
+	// rather than waiting for the next TickSearch() cycle.
+	SearchForGames();
+#endif
 }
 
 INetworkPlayer *CPlatformNetworkManagerStub::addNetworkPlayer(IQNetPlayer *pQNetPlayer)

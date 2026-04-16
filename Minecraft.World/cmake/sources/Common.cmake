@@ -11,6 +11,8 @@ set(_MINECRAFT_WORLD_COMMON_CONSOLEHELPERS
   "${CMAKE_CURRENT_SOURCE_DIR}/HashExtension.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/PerformanceTimer.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/PerformanceTimer.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ArabicShaping.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ArabicShaping.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/StringHelpers.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/StringHelpers.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/ThreadName.cpp"

@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "UIController.h"
+#include <ChatScreen.h>
 #include "UI.h"
 #include "UIScene.h"
 #include "UIControl_Slider.h"
@@ -13,6 +14,7 @@
 #include "../../EnderDragonRenderer.h"
 #include "../../MultiPlayerLocalPlayer.h"
 #include "UIFontData.h"
+#include "UIUnicodeBitmapFont.h"
 #include "UISplitScreenHelpers.h"
 #ifdef _WINDOWS64
 #include "../../Windows64/KeyboardMouseInput.h"
@@ -193,6 +195,7 @@ UIController::UIController()
 	m_mcTTFFont = nullptr;
 	m_moj7 = nullptr;
 	m_moj11 = nullptr;
+	m_unicodeBitmapFont = nullptr;
 
 	// 4J-JEV: It's important that these remain the same, unless updateCurrentLanguage is going to be called.
 	m_eCurrentFont = m_eTargetFont = eFont_NotLoaded;
@@ -307,6 +310,14 @@ void UIController::postInit()
 	IggySetAS3ExternalFunctionCallbackUTF16 ( &UIController::ExternalFunctionCallback, this );
 	IggySetTextureSubstitutionCallbacks ( &UIController::TextureSubstitutionCreateCallback , &UIController::TextureSubstitutionDestroyCallback, this );
 
+	// Load a unicode bitmap font as Iggy's global fallback for characters not
+	// covered by the Mojangles bitmap font (CJK, Thai, Arabic, Korean, etc.).
+	// Uses the same glyph page PNGs as the legacy Font class, with matching
+	// Mojangles metrics for correct vertical alignment.
+	m_unicodeBitmapFont = new UIUnicodeBitmapFont("Mojangles_Unicode_Bitmap", SFontData::Mojangles_7);
+	m_unicodeBitmapFont->registerFont();
+	IggyFontSetFallbackFontUTF8("Mojangles_Unicode_Bitmap", -1, IGGY_FONTFLAG_none);
+
 	SetupFont();
 	//
 	loadSkins();
@@ -419,10 +430,28 @@ void UIController::SetupFont()
 	else if (m_eTargetFont != eFont_NotLoaded)
 	{
 		m_mcTTFFont = createFont(m_eTargetFont);
+		if (m_mcTTFFont == nullptr || !m_mcTTFFont->isLoaded())
+		{
+			if (m_mcTTFFont != nullptr)
+			{
+				delete m_mcTTFFont;
+				m_mcTTFFont = nullptr;
+			}
 
-		app.DebugPrintf("[Iggy] Set font indirect to '%hs'.\n", m_mcTTFFont->getFontName().c_str());
-		IggyFontSetIndirectUTF8( "Mojangles7",	-1, IGGY_FONTFLAG_all, m_mcTTFFont->getFontName().c_str(), -1, IGGY_FONTFLAG_none );
-		IggyFontSetIndirectUTF8( "Mojangles11",	-1, IGGY_FONTFLAG_all, m_mcTTFFont->getFontName().c_str(), -1, IGGY_FONTFLAG_none );
+			app.DebugPrintf("Failed to load font %i. Falling back to bitmaps.\n", nextLanguage);
+			m_eTargetFont = eFont_Bitmap;
+
+			if (m_moj7 == nullptr) m_moj7 = new UIBitmapFont(SFontData::Mojangles_7);
+			if (m_moj11 == nullptr) m_moj11 = new UIBitmapFont(SFontData::Mojangles_11);
+			m_moj7->registerFont();
+			m_moj11->registerFont();
+		}
+		else
+		{
+			app.DebugPrintf("[Iggy] Set font indirect to '%hs'.\n", m_mcTTFFont->getFontName().c_str());
+			IggyFontSetIndirectUTF8( "Mojangles7",	-1, IGGY_FONTFLAG_all, m_mcTTFFont->getFontName().c_str(), -1, IGGY_FONTFLAG_none );
+			IggyFontSetIndirectUTF8( "Mojangles11",	-1, IGGY_FONTFLAG_all, m_mcTTFFont->getFontName().c_str(), -1, IGGY_FONTFLAG_none );
+		}
 	}
 	else
 	{
@@ -1076,8 +1105,11 @@ void UIController::tickInput()
 
 								if (sceneMouseX >= cx && sceneMouseX <= cx + cw && sceneMouseY >= cy && sceneMouseY <= cy + ch)
 								{
-									m_mouseDraggingSliderScene = pScene->getSceneType();
-									m_mouseDraggingSliderId = pSlider->getId();
+									if (pScene->canMoveSlider(pSlider->getId()))
+									{
+										m_mouseDraggingSliderScene = pScene->getSceneType();
+										m_mouseDraggingSliderId = pSlider->getId();
+									}
 									break;
 								}
 							}
@@ -1087,7 +1119,7 @@ void UIController::tickInput()
 					if (leftDown && m_mouseDraggingSliderScene == pScene->getSceneType() && m_mouseDraggingSliderId >= 0)
 					{
 						UIControl_Slider *pSlider = FindSliderById(pScene, m_mouseDraggingSliderId);
-						if (pSlider && pSlider->getVisible())
+						if (pSlider && pSlider->getVisible() && pScene->canMoveSlider(m_mouseDraggingSliderId))
 						{
 							pSlider->UpdateControl();
 							S32 sliderX = pSlider->getXPos() + panelOffsetX;
@@ -1427,6 +1459,9 @@ void UIController::handleKeyPress(unsigned int iPad, unsigned int key)
 		}
 	}
 #endif
+
+	if (key == 4) ChatScreen::setWheelValue(1);
+	if (key == 5) ChatScreen::setWheelValue(-1);
 
 	if(pressed) app.DebugPrintf("Pressed %d\n",key);
 	if(released) app.DebugPrintf("Released %d\n",key);

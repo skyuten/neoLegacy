@@ -45,7 +45,8 @@ C_4JProfile ProfileManager;
 CSentientManager SentientManager;
 CXuiStringTable StringTable;
 
-#ifndef _XBOX_ONE
+
+#if !defined(_XBOX_ONE) && !defined(_WINDOWS64)
 ATG::XMLParser::XMLParser() {}
 ATG::XMLParser::~XMLParser() {}
 HRESULT    ATG::XMLParser::ParseXMLBuffer(CONST CHAR* strBuffer, UINT uBufferSize) { return S_OK; }
@@ -196,9 +197,29 @@ void IQNetPlayer::SendData(IQNetPlayer * player, const void* pvData, DWORD dwDat
 	{
 		if (!WinsockNetLayer::IsHosting() && !m_isRemote)
 		{
+			// Client sending to server via local socket (bypasses SendToSmallId)
 			SOCKET sock = WinsockNetLayer::GetLocalSocket(m_smallId);
 			if (sock != INVALID_SOCKET)
-				WinsockNetLayer::SendOnSocket(sock, pvData, dwDataSize);
+			{
+				// Encrypt if client send cipher is active
+				if (dwDataSize > 0)
+				{
+					std::vector<BYTE> buf(static_cast<const BYTE*>(pvData),
+						static_cast<const BYTE*>(pvData) + dwDataSize);
+					if (WinsockNetLayer::TryEncryptClientOutgoing(buf.data(), static_cast<int>(dwDataSize)))
+					{
+						WinsockNetLayer::SendOnSocket(sock, buf.data(), static_cast<int>(dwDataSize));
+					}
+					else
+					{
+						WinsockNetLayer::SendOnSocket(sock, pvData, dwDataSize);
+					}
+				}
+				else
+				{
+					WinsockNetLayer::SendOnSocket(sock, pvData, dwDataSize);
+				}
+			}
 		}
 		else
 		{

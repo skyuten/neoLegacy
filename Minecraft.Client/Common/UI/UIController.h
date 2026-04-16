@@ -7,6 +7,7 @@ using namespace std;
 
 class UIAbstractBitmapFont;
 class UIBitmapFont;
+class UIUnicodeBitmapFont;
 class UITTFFont;
 class UIComponent_DebugUIConsole;
 class UIComponent_DebugUIMarketingGuide;
@@ -63,6 +64,7 @@ private:
 	UIAbstractBitmapFont *m_mcBitmapFont;
 	UITTFFont *m_mcTTFFont;
 	UIBitmapFont *m_moj7, *m_moj11;
+	UIUnicodeBitmapFont *m_unicodeBitmapFont;
 
 	std::mt19937 m_randomGenerator;
 	std::uniform_real_distribution<float> m_randomDistribution;

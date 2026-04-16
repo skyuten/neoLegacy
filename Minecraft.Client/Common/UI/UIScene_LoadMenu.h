@@ -15,7 +15,7 @@ private:
 		eControl_OnlineGame,
 	};
 
-	static int m_iDifficultyTitleSettingA[4];
+    static int m_iDifficultyTitleSettingA[5];
 	static int m_iGamemodes[3];
 
 	UIControl m_controlMainPanel;
@@ -72,6 +72,7 @@ private:
 	wstring m_thumbnailName;
 
 	bool m_bRebuildTouchBoxes;
+	bool m_bHardcore;
 public:
 	UIScene_LoadMenu(int iPad, void *initData, UILayer *parentLayer);
 
@@ -99,6 +100,7 @@ protected:
 	void handlePress(F64 controlId, F64 childId);
 	void handleSliderMove(F64 sliderId, F64 currentValue);
 	virtual void handleGainFocus(bool navBack);
+	virtual bool canMoveSlider(F64 sliderId);
 
 private:
 	void StartSharedLaunchFlow();

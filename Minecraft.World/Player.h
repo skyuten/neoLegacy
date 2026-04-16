@@ -122,6 +122,13 @@ public:
 	int experienceLevel, totalExperience;
 	float experienceProgress;
 
+	bool fk_hasDeathState = false;
+	bool fk_deathKeepInventory = false;
+	bool fk_deathKeepLevel = false;
+	int fk_deathNewExp = 0;
+	int fk_deathNewLevel = 0;
+	bool fk_sleepingIgnored = false;
+
 	// 4J Stu - Made protected so that we can access it from MultiPlayerLocalPlayer
 protected:
 	shared_ptr<ItemInstance> useItem;

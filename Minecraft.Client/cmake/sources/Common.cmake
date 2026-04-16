@@ -277,7 +277,7 @@ source_group("Common/UI" FILES ${_MINECRAFT_CLIENT_COMMON_COMMON_UI})
 
 set(_MINECRAFT_CLIENT_COMMON_COMMON_UI_ALL_PLATFORMS
   "${CMAKE_CURRENT_SOURCE_DIR}/ArchiveFile.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/ArchiveFile.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ArchiveFile.h" 
   "${BASE_DIR}/UI/IUIController.h"
   "${BASE_DIR}/UI/IUIScene_AbstractContainerMenu.cpp"
   "${BASE_DIR}/UI/IUIScene_AbstractContainerMenu.h"
@@ -414,6 +414,8 @@ source_group("Windows64/Iggy/gdraw" FILES ${_MINECRAFT_CLIENT_COMMON_WINDOWS64_I
 set(_MINECRAFT_CLIENT_COMMON_WINDOWS64_NETWORK
   "${CMAKE_CURRENT_SOURCE_DIR}/Windows64/Network/WinsockNetLayer.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/Windows64/Network/WinsockNetLayer.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Server/Security/StreamCipher.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Server/Security/StreamCipher.h"
 )
 source_group("Windows64/Network" FILES ${_MINECRAFT_CLIENT_COMMON_WINDOWS64_NETWORK})
 
@@ -622,7 +624,7 @@ set(_MINECRAFT_CLIENT_COMMON_NET_MINECRAFT_CLIENT_MODEL
   "${CMAKE_CURRENT_SOURCE_DIR}/ArmorStandModel.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/EndermiteModel.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/EndermiteModel.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/GuardianModel.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/GuardianModel.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/GuardianModel.h"
 
 )
@@ -903,7 +905,8 @@ set(_MINECRAFT_CLIENT_COMMON_NET_MINECRAFT_CLIENT_RENDERER_ENTITY
   "${CMAKE_CURRENT_SOURCE_DIR}/RabbitRenderer.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/ArmorStandRenderer.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/EndermiteRenderer.cpp"
-   "${CMAKE_CURRENT_SOURCE_DIR}/GuardianRenderer.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/EndermiteRenderer.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/GuardianRenderer.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/GuardianRenderer.h"
 )
 source_group("net/minecraft/client/renderer/entity" FILES ${_MINECRAFT_CLIENT_COMMON_NET_MINECRAFT_CLIENT_RENDERER_ENTITY})

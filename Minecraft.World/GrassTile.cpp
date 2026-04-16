@@ -5,6 +5,10 @@
 #include "net.minecraft.world.level.biome.h"
 #include "net.minecraft.h"
 #include "net.minecraft.world.h"
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+#include "../Minecraft.Server/FourKitBridge.h"
+#include "Dimension.h"
+#endif
 
 // AP - included for PSVita Alpha cut out optimisation
 #include "IntBuffer.h"
@@ -108,6 +112,9 @@ void GrassTile::tick(Level *level, int x, int y, int z, Random *random)
 				int above = level->getTile(xt, yt + 1, zt);
 				if (level->getTile(xt, yt, zt) == Tile::dirt_Id && level->getData(xt, yt, zt) == 0 && level->getRawBrightness(xt, yt + 1, zt) >= MIN_BRIGHTNESS && Tile::lightBlock[above] <= 2)
 				{
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+					if (!FourKitBridge::FireBlockSpread(level->dimension->id, xt, yt, zt, x, y, z, Tile::grass_Id, 0))
+#endif
 					level->setTileAndUpdate(xt, yt, zt, Tile::grass_Id);
 				}
 			}

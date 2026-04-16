@@ -26,6 +26,8 @@
 #define GAME_CREATE_ONLINE_TIMER_ID 0
 #define GAME_CREATE_ONLINE_TIMER_TIME 100
 
+static bool s_bHardcore = false; // 4J Added: tracks when difficulty slider is at Hardcore position (file-scope to avoid header layout changes)
+
 int UIScene_CreateWorldMenu::m_iDifficultyTitleSettingA[4]=
 {
 	IDS_DIFFICULTY_TITLE_PEACEFUL,
@@ -65,8 +67,9 @@ UIScene_CreateWorldMenu::UIScene_CreateWorldMenu(int iPad, void *initData, UILay
 
 	WCHAR TempString[256];
 	swprintf( (WCHAR *)TempString, 256, L"%ls: %ls", app.GetString( IDS_SLIDER_DIFFICULTY ),app.GetString(m_iDifficultyTitleSettingA[app.GetGameSettings(m_iPad,eGameSetting_Difficulty)]));
-	m_sliderDifficulty.init(TempString,eControl_Difficulty,0,3,app.GetGameSettings(m_iPad,eGameSetting_Difficulty));
+	m_sliderDifficulty.init(TempString,eControl_Difficulty,0,4,app.GetGameSettings(m_iPad,eGameSetting_Difficulty));
 
+	s_bHardcore = false;
 	m_MoreOptionsParams.bGenerateOptions=TRUE;
 	m_MoreOptionsParams.bStructures=TRUE;
 	m_MoreOptionsParams.bFlatWorld=FALSE;
@@ -463,25 +466,27 @@ void UIScene_CreateWorldMenu::handlePress(F64 controlId, F64 childId)
 #endif
 		}
 		break;
-	//case eControl_GameModeToggle:
-	//	switch(m_iGameModeId)
-	//	{
-	//	case 0: // Creative
-	//		m_buttonGamemode.setLabel(app.GetString(IDS_GAMEMODE_CREATIVE));
-	//		m_iGameModeId = GameType::CREATIVE->getId();
-	//		m_bGameModeCreative = true;
-	//		break;
-	//	case 1: // Adventure
-	//		m_buttonGamemode.setLabel(app.GetString(IDS_GAMEMODE_ADVENTURE));
-	//		m_iGameModeId = GameType::ADVENTURE->getId();
-	//		m_bGameModeCreative = false;
-	//		break;
-	//	case 2: // Survival 
-	//		m_buttonGamemode.setLabel(app.GetString(IDS_GAMEMODE_SURVIVAL));
-	//		m_iGameModeId = GameType::SURVIVAL->getId();
-	//		m_bGameModeCreative = false;
-	//	};
-	//	break;
+	// case eControl_GameModeToggle:
+	// 	if (s_bHardcore)
+	// 		break; // Hardcore mode locks game mode to Survival
+	// 	switch(m_iGameModeId)
+	// 	{
+	// 	case 0: // Creative
+	// 		m_buttonGamemode.setLabel(app.GetString(IDS_GAMEMODE_CREATIVE));
+	// 		m_iGameModeId = GameType::CREATIVE->getId();
+	// 		m_bGameModeCreative = true;
+	// 		break;
+	// 	case 1: // Adventure
+	// 		m_buttonGamemode.setLabel(app.GetString(IDS_GAMEMODE_ADVENTURE));
+	// 		m_iGameModeId = GameType::ADVENTURE->getId();
+	// 		m_bGameModeCreative = false;
+	// 		break;
+	// 	case 2: // Survival
+	// 		m_buttonGamemode.setLabel(app.GetString(IDS_GAMEMODE_SURVIVAL));
+	// 		m_iGameModeId = GameType::SURVIVAL->getId();
+	// 		m_bGameModeCreative = false;
+	// 	};
+	// 	break;
 	case eControl_MoreOptions:
 		ui.NavigateToScene(m_iPad, eUIScene_LaunchMoreOptionsMenu, &m_MoreOptionsParams);
 		break;
@@ -660,12 +665,39 @@ void UIScene_CreateWorldMenu::handleSliderMove(F64 sliderId, F64 currentValue)
 	case eControl_Difficulty:
 		m_sliderDifficulty.handleSliderMove(value);
 
-		app.SetGameSettings(m_iPad,eGameSetting_Difficulty,value);
-		swprintf( (WCHAR *)TempString, 256, L"%ls: %ls", app.GetString( IDS_SLIDER_DIFFICULTY ),app.GetString(m_iDifficultyTitleSettingA[value]));
+		// 4J Added: Difficulty value 4 = Hardcore (store actual difficulty as Hard, track hardcore separately)
+		s_bHardcore = (value >= 4);
+		app.SetGameSettings(m_iPad, eGameSetting_Difficulty, s_bHardcore ? 3 : value);
+		if (value >= 4)
+			swprintf( (WCHAR *)TempString, 256, L"%ls: %ls", app.GetString( IDS_SLIDER_DIFFICULTY ), app.GetString(IDS_HARDCORE));
+		else
+			swprintf( (WCHAR *)TempString, 256, L"%ls: %ls", app.GetString( IDS_SLIDER_DIFFICULTY ),app.GetString(m_iDifficultyTitleSettingA[value]));
 		m_sliderDifficulty.setLabel(TempString);
+
+		// Hardcore locks game mode to Survival
+		if (s_bHardcore && m_iGameModeId != GameType::SURVIVAL->getId())
+		{
+			m_iGameModeId = GameType::SURVIVAL->getId();
+			m_bGameModeCreative = false;
+		    m_sliderGamemode.handleSliderMove(GameType::SURVIVAL->getId());
+		    m_sliderGamemode.setLabel(app.GetString(IDS_GAMEMODE_SURVIVAL));
+		}
 		break;
 	case eControl_GameModeToggle:
-		m_sliderGamemode.handleSliderMove(value);
+	    // Hardcore locks game mode to Survival
+	    if (s_bHardcore)
+	    {
+	        if (value != GameType::SURVIVAL->getId())
+	        {
+	            m_sliderGamemode.handleSliderMove(GameType::SURVIVAL->getId());
+	            m_sliderGamemode.setLabel(app.GetString(IDS_GAMEMODE_SURVIVAL));
+	            return;
+	        }
+	    }
+	    else
+	    {
+	        m_sliderGamemode.handleSliderMove(value);
+	    }
 		switch (value)
 		{
 		case 0: // Survival
@@ -689,6 +721,16 @@ void UIScene_CreateWorldMenu::handleSliderMove(F64 sliderId, F64 currentValue)
 		break;
 	}
 }
+
+bool UIScene_CreateWorldMenu::canMoveSlider(F64 sliderId)
+{
+    // Prevent gamemode slider movement when hardcore is enabled
+    if (sliderId == eControl_GameModeToggle && s_bHardcore)
+        return false;
+    
+    return true;
+}
+
 
 void UIScene_CreateWorldMenu::handleTimerComplete(int id)
 {
@@ -852,7 +894,7 @@ void UIScene_CreateWorldMenu::checkStateAndStartGame()
 			// 4J Stu - This is a bit messy and is due to the library incorrectly returning false for IsSignedInLive if the npAvailability isn't SCE_OK
 			UINT uiIDA[1];
 			uiIDA[0]=IDS_OK;
-			ui.RequestErrorMessage(IDS_ONLINE_SERVICE_TITLE, IDS_CONTENT_RESTRICTION, uiIDA, 1, iPadNotSignedInLive);
+			ui.RequestAlertMessage(IDS_ONLINE_SERVICE_TITLE, IDS_CONTENT_RESTRICTION, uiIDA, 1, iPadNotSignedInLive);
 		}
 		else
 		{
@@ -1142,6 +1184,10 @@ void UIScene_CreateWorldMenu::CreateGame(UIScene_CreateWorldMenu* pClass, DWORD 
 	StorageManager.ResetSaveData();
 	// Make our next save default to the name of the level
 	StorageManager.SetSaveTitle((wchar_t *)wWorldName.c_str());
+#ifdef _WINDOWS64
+	// New world — save folder doesn't exist yet, clear for now (will be set after first autosave)
+	app.SetCurrentSaveFolderName(L"");
+#endif
 
 	wstring wSeed;
 	if(!pClass->m_MoreOptionsParams.seed.empty() )
@@ -1208,7 +1254,9 @@ void UIScene_CreateWorldMenu::CreateGame(UIScene_CreateWorldMenu* pClass, DWORD 
 	Minecraft *pMinecraft = Minecraft::GetInstance();
 	pMinecraft->skins->selectTexturePackById(pClass->m_MoreOptionsParams.dwTexturePack);
 
-	app.SetGameHostOption(eGameHostOption_Difficulty,Minecraft::GetInstance()->options->difficulty);
+	// 4J Added: If hardcore was selected on difficulty slider, set difficulty to Hard and enable hardcore flag
+	app.SetGameHostOption(eGameHostOption_Difficulty, Minecraft::GetInstance()->options->difficulty);
+	app.SetGameHostOption(eGameHostOption_Hardcore, s_bHardcore ? 1 : 0);
 	app.SetGameHostOption(eGameHostOption_FriendsOfFriends,pClass->m_MoreOptionsParams.bAllowFriendsOfFriends);
 	app.SetGameHostOption(eGameHostOption_Gamertags,app.GetGameSettings(pClass->m_iPad,eGameSetting_GamertagsVisible)?1:0);
 

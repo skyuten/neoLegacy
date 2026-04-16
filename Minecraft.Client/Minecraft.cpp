@@ -1544,8 +1544,12 @@ void Minecraft::run_middle()
 						// Utility keys always work regardless of KBM active state
 						if(g_KBMInput.IsKeyPressed(KeyboardMouseInput::KEY_PAUSE) && !ui.GetMenuDisplayed(i))
 						{
-							localplayers[i]->ullButtonsPressed|=1LL<<MINECRAFT_ACTION_PAUSEMENU;
-							app.DebugPrintf("PAUSE PRESSED (keyboard) - ipad = %d\n",i);
+							if (dynamic_cast<ChatScreen*>(getScreen()) != nullptr) {
+								setScreen(nullptr);
+							} else {
+								localplayers[i]->ullButtonsPressed|=1LL<<MINECRAFT_ACTION_PAUSEMENU;
+								app.DebugPrintf("PAUSE PRESSED (keyboard) - ipad = %d\n",i);
+							}
 						}
 
 						if(g_KBMInput.IsKeyPressed(KeyboardMouseInput::KEY_THIRD_PERSON))
@@ -4360,8 +4364,8 @@ void Minecraft::setLevel(MultiPlayerLevel *level, int message /*=-1*/, shared_pt
 		this->progressRenderer->progressStage(-1);
 	}
 
-	// 4J-PB - since we now play music in the menu, just let it keep playing
-	//soundEngine->playStreaming(L"", 0, 0, 0, 0, 0);
+	// Stop menu music and transition to game music for the new level
+	soundEngine->playStreaming(L"", 0, 0, 0, 1, 1);
 
 	// 4J - stop update thread from processing this level, which blocks until it is safe to move on - will be re-enabled if we set the level to be non-nullptr
 	gameRenderer->DisableUpdateThread();

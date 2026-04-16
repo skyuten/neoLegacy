@@ -265,6 +265,8 @@ private:
 private:
 	// 4J Added
 	bool m_saveOnExit;
+	bool m_deleteWorldOnExit; // 4J Added - for hardcore mode world deletion
+	wstring m_saveFolderName; // 4J Added - stored for hardcore world deletion
 	bool m_suspending;
 
 public:
@@ -278,6 +280,9 @@ public:
 	void chunkPacketManagement_PostTick();
 
 	void setSaveOnExit(bool save) { m_saveOnExit = save; s_bSaveOnExitAnswered = true; }
+	void setDeleteWorldOnExit(bool del) { m_deleteWorldOnExit = del; }
+	bool getDeleteWorldOnExit() const { return m_deleteWorldOnExit; }
+	const wstring& getSaveFolderName() const { return m_saveFolderName; }
 	void Suspend();
 	bool IsSuspending();
 

@@ -269,7 +269,9 @@ const WCHAR *ConsoleSoundEngine::wchSoundNames[eSoundType_MAX]=
 	L"item.armor.equip_generic3",
 	L"item.armor.equip_generic4",
 	L"item.armor.equip_generic5",
-	L"item.armor.equip_generic6"
+	L"item.armor.equip_generic6",
+
+	L"damage.critical",				//eSoundType_DAMAGE_CRITICAL,
 };
 
 

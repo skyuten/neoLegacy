@@ -487,37 +487,52 @@ void PlayerChunkMap::getChunkAndRemovePlayer(int x, int z, shared_ptr<ServerPlay
 }
 
 // 4J - added - actually create & add player to a playerchunk, if there is one queued for this player.
+// Processes up to CHUNKS_PER_PLAYER_PER_TICK requests per call to speed up initial chunk loading.
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+static const int CHUNKS_PER_PLAYER_PER_TICK = 16;
+#else
+static const int CHUNKS_PER_PLAYER_PER_TICK = 1;
+#endif
+
 void PlayerChunkMap::tickAddRequests(shared_ptr<ServerPlayer> player)
 {
 	if( addRequests.size() )
 	{
-		// Find the nearest chunk request to the player
 		int px = static_cast<int>(player->x);
 		int pz = static_cast<int>(player->z);
-		int minDistSq = -1;
 
-        auto itNearest = addRequests.end();
-        for (auto it = addRequests.begin(); it != addRequests.end(); it++)
-        {
-			if( it->player == player )
+		for (int processed = 0; processed < CHUNKS_PER_PLAYER_PER_TICK; processed++)
+		{
+			// Find the nearest chunk request to the player
+			int minDistSq = -1;
+			auto itNearest = addRequests.end();
+			for (auto it = addRequests.begin(); it != addRequests.end(); it++)
 			{
-				int xm = ( it->x  * 16 ) + 8;
-				int zm = ( it->z  * 16 ) + 8;
-				int distSq = (xm - px) * (xm - px) +
-							 (zm - pz) * (zm - pz);
-				if( ( minDistSq == -1 ) || ( distSq < minDistSq ) )
+				if( it->player == player )
 				{
-					minDistSq = distSq;
-					itNearest = it;
+					int xm = ( it->x  * 16 ) + 8;
+					int zm = ( it->z  * 16 ) + 8;
+					int distSq = (xm - px) * (xm - px) +
+								 (zm - pz) * (zm - pz);
+					if( ( minDistSq == -1 ) || ( distSq < minDistSq ) )
+					{
+						minDistSq = distSq;
+						itNearest = it;
+					}
 				}
 			}
-		}
 
-		// If we found one at all, then do this one
-		if( itNearest != addRequests.end() )
-		{
-			getChunk(itNearest->x, itNearest->z, true)->add(itNearest->player);
-			addRequests.erase(itNearest);
+			// If we found one, process it and continue; otherwise done
+			if( itNearest != addRequests.end() )
+			{
+				getChunk(itNearest->x, itNearest->z, true)->add(itNearest->player);
+				addRequests.erase(itNearest);
+			}
+			else
+			{
+				break;
+			}
 		}
 	}
 }
@@ -792,6 +807,14 @@ void PlayerChunkMap::setRadius(int newRadius)
 				int xc = static_cast<int>(player->x) >> 4;
 				int zc = static_cast<int>(player->z) >> 4;
 
+				for (auto it = addRequests.begin(); it != addRequests.end(); )
+				{
+					if (it->player == player)
+						it = addRequests.erase(it);
+					else
+						++it;
+				}
+
 				for (int x = xc - newRadius; x <= xc + newRadius; x++)
 					for (int z = zc - newRadius; z <= zc + newRadius; z++)
 					{
@@ -801,6 +824,18 @@ void PlayerChunkMap::setRadius(int newRadius)
 							getChunkAndAddPlayer(x, z, player);
 						}
 					}
+
+				// Remove chunks that are outside the new radius
+				for (int x = xc - radius; x <= xc + radius; x++)
+				{
+					for (int z = zc - radius; z <= zc + radius; z++)
+					{
+						if (x < xc - newRadius || x > xc + newRadius || z < zc - newRadius || z > zc + newRadius)
+						{
+							getChunkAndRemovePlayer(x, z, player);
+						}
+					}
+				}
 			}
 		}
 

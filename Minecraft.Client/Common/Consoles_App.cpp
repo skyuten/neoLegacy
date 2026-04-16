@@ -207,6 +207,8 @@ CMinecraftApp::CMinecraftApp()
 	m_dwRequiredTexturePackID=0;
 
 	m_bResetNether=false;
+	m_seedOverride = 0;
+	m_hasSeedOverride = false;
 
 #ifdef _XBOX
 	//	m_bTransferSavesToXboxOne=false;
@@ -326,11 +328,73 @@ void CMinecraftApp::DebugPrintf(int user, const char *szFormat, ...)
 #endif
 }
 
+namespace
+{
+const wchar_t *ResolveStringKeyFromId(int iID)
+{
+#ifdef _WINDOWS64
+    switch(iID)
+    {
+    #include "StringIdLookup.generated.inc"
+    default:
+        return nullptr;
+    }
+#else
+    (void)iID;
+    return nullptr;
+#endif
+}
+}
+
 LPCWSTR CMinecraftApp::GetString(int iID)
 {
-	//return L"Değişiklikler ve Yenilikler";
-	//return L"ÕÕÕÕÖÖÖÖ";
-	return app.m_stringTable->getString(iID);
+    if(app.m_stringTable == nullptr)
+    {
+        const wchar_t *key = ResolveStringKeyFromId(iID);
+        return key != nullptr ? key : L"";
+    }
+
+    LPCWSTR byIndex = app.m_stringTable->getString(iID);
+    if(byIndex != nullptr && byIndex[0] != L'\0')
+    {
+        return byIndex;
+    }
+
+    const wchar_t *key = ResolveStringKeyFromId(iID);
+    if(key != nullptr)
+    {
+        LPCWSTR byKey = app.m_stringTable->getString(key);
+        if(byKey != nullptr && byKey[0] != L'\0')
+        {
+            return byKey;
+        }
+
+        // Prefer visible fallback text instead of returning an empty string.
+        return key;
+    }
+
+    return L"";
+}
+
+LPCWSTR CMinecraftApp::GetString(const wchar_t *id)
+{
+    if(id == nullptr)
+    {
+        return L"";
+    }
+
+    if(app.m_stringTable == nullptr)
+    {
+        return id;
+    }
+
+    LPCWSTR byKey = app.m_stringTable->getString(id);
+    if(byKey != nullptr && byKey[0] != L'\0')
+    {
+        return byKey;
+    }
+
+    return id;
 }
 
 void CMinecraftApp::SetAction(int iPad, eXuiAction action, LPVOID param)
@@ -1398,6 +1462,7 @@ void CMinecraftApp::ApplyGameSettingsChanged(int iPad)
 	ActionGameSettings(iPad,eGameSetting_AnimatedCharacter);
 
 	ActionGameSettings(iPad,eGameSetting_PS3_EULA_Read);
+	ActionGameSettings(iPad,eGameSetting_VSync);
 
 }
 
@@ -1632,6 +1697,22 @@ void CMinecraftApp::ActionGameSettings(int iPad,eGameSetting eVal)
 		break;
 	case eGameSetting_PSVita_NetworkModeAdhoc:
 		//nothing to do here
+		break;
+	case eGameSetting_VSync:
+#ifdef _WINDOWS64
+		{
+			extern bool g_bVSync;
+			g_bVSync = (GetGameSettings(iPad, eGameSetting_VSync) != 0);
+		}
+#endif
+		break;
+	case eGameSetting_ExclusiveFullscreen:
+#ifdef _WINDOWS64
+		{
+			extern void SetExclusiveFullscreen(bool enabled);
+			SetExclusiveFullscreen(GetGameSettings(iPad, eGameSetting_ExclusiveFullscreen) != 0);
+		}
+#endif
 		break;
 	}
 }
@@ -2344,6 +2425,38 @@ void CMinecraftApp::SetGameSettings(int iPad,eGameSetting eVal,unsigned char ucV
 		}
 		break;
 
+	case eGameSetting_VSync:
+		if(((GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_VSYNC)>>24)!=(ucVal&0x01))
+		{
+			if(ucVal==1)
+			{
+				GameSettingsA[iPad]->uiBitmaskValues|=GAMESETTING_VSYNC;
+			}
+			else
+			{
+				GameSettingsA[iPad]->uiBitmaskValues&=~GAMESETTING_VSYNC;
+			}
+			ActionGameSettings(iPad,eVal);
+			GameSettingsA[iPad]->bSettingsChanged=true;
+		}
+		break;
+
+	case eGameSetting_ExclusiveFullscreen:
+		if(((GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_EXCLUSIVEFULLSCREEN)>>25)!=(ucVal&0x01))
+		{
+			if(ucVal==1)
+			{
+				GameSettingsA[iPad]->uiBitmaskValues|=GAMESETTING_EXCLUSIVEFULLSCREEN;
+			}
+			else
+			{
+				GameSettingsA[iPad]->uiBitmaskValues&=~GAMESETTING_EXCLUSIVEFULLSCREEN;
+			}
+			ActionGameSettings(iPad,eVal);
+			GameSettingsA[iPad]->bSettingsChanged=true;
+		}
+		break;
+
 	}
 }
 
@@ -2478,6 +2591,12 @@ unsigned char CMinecraftApp::GetGameSettings(int iPad,eGameSetting eVal)
 
 	case eGameSetting_PSVita_NetworkModeAdhoc:
 		return (GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_PSVITANETWORKMODEADHOC)>>17;
+
+	case eGameSetting_VSync:
+		return (GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_VSYNC)>>24;
+
+	case eGameSetting_ExclusiveFullscreen:
+		return (GameSettingsA[iPad]->uiBitmaskValues&GAMESETTING_EXCLUSIVEFULLSCREEN)>>25;
 
 	}
 	return 0;
@@ -4441,20 +4560,20 @@ void CMinecraftApp::loadMediaArchive()
 	wstring mediapath = L"";
 
 #ifdef __PS3__
-	mediapath = L"Common\\Media\\MediaPS3.arc";
+	mediapath = L"Common\\Media\\MediaPS3";
 #elif _WINDOWS64
-	mediapath = L"Common\\Media\\MediaWindows64.arc";
+	mediapath = L"Common\\Media\\MediaWindows64";
 #elif __ORBIS__
-	mediapath = L"Common\\Media\\MediaOrbis.arc";
+	mediapath = L"Common\\Media\\MediaOrbis";
 #elif _DURANGO
-	mediapath = L"Common\\Media\\MediaDurango.arc";
+	mediapath = L"Common\\Media\\MediaDurango";
 #elif __PSVITA__
-	mediapath = L"Common\\Media\\MediaPSVita.arc";
+	mediapath = L"Common\\Media\\MediaPSVita";
 #endif
 
 	if (!mediapath.empty())
 	{
-		m_mediaArchive = new ArchiveFile( File(mediapath) );
+		m_mediaArchive = new FolderFile(mediapath);
 	}
 #if 0
 	string path = "Common\\media.arc";
@@ -4506,6 +4625,58 @@ void CMinecraftApp::loadStringTable()
 		// we need to unload the current string table, this is a reload
 		delete m_stringTable;
 	}
+#ifdef _WINDOWS64
+	m_stringTable = nullptr;
+	const wstring localisationCandidates[] =
+	{
+		L"Common\\Localization", // Fireblade - check multiple directories before resulting to .loc usage
+		L"Windows64Media\\loc",
+		L"..\\Minecraft.Client\\Windows64Media\\loc"
+	};
+
+	for (const auto &localisationFolder : localisationCandidates)
+	{
+		File localisationDirectory(localisationFolder);
+		if (localisationDirectory.exists() && localisationDirectory.isDirectory())
+		{
+			StringTable *candidateTable = new StringTable(localisationFolder); // Fireblade - xml before loc
+
+			const bool hasKeyString = candidateTable->hasStringKey(L"IDS_OK");
+			bool hasIndexString = false;
+			#ifdef IDS_OK
+			LPCWSTR indexedString = candidateTable->getString(IDS_OK);
+			hasIndexString = (indexedString != nullptr && indexedString[0] != L'\0');
+			#endif
+
+			if (hasKeyString || hasIndexString)
+			{
+			    m_stringTable = candidateTable;
+			    app.DebugPrintf("Loaded language data from '%ls'\n", localisationFolder.c_str());
+			    break;
+			}
+
+			app.DebugPrintf("Ignoring localisation path '%ls' (missing expected IDs)\n", localisationFolder.c_str());
+			delete candidateTable;
+		}
+	}
+
+	if (m_stringTable == nullptr && m_mediaArchive != nullptr) // Fireblade - fallback to previous behavior
+	{
+		const wstring localisationFile = L"languages.loc";
+		if (m_mediaArchive->hasFile(localisationFile))
+		{
+			byteArray locFile = m_mediaArchive->getFile(localisationFile);
+			m_stringTable = new StringTable(locFile.data, locFile.length);
+			delete locFile.data;
+		}
+	}
+
+	if (m_stringTable == nullptr)
+	{
+		app.DebugPrintf("Failed to initialize language data\n");
+		assert(false);
+	}
+#else // Fireblade - other platforms keep same logic
 	wstring localisationFile = L"languages.loc";
 	if (m_mediaArchive->hasFile(localisationFile))
 	{
@@ -4519,6 +4690,7 @@ void CMinecraftApp::loadStringTable()
 		assert(false);
 		// AHHHHHHHHH.
 	}
+#endif
 #endif
 }
 
@@ -6614,6 +6786,87 @@ wstring CMinecraftApp::FormatHTMLString(int iPad, const wstring &desc, int shado
 	return text;
 }
 
+//found list of html escapes at https://stackoverflow.com/questions/7381974/which-characters-need-to-be-escaped-in-html
+wstring CMinecraftApp::EscapeHTMLString(const wstring& desc)
+{
+	static std::unordered_map<wchar_t, wchar_t*> replacementMap = {
+		{L'&', L"&amp;"},
+		{L'<', L"&lt;"},
+		{L'>', L"&gt;"},
+		{L'\"', L"&quot;"},
+		{L'\'', L"&#39;"},
+	};
+
+	wstring finalString = L"";
+	for (int i = 0; i < desc.size(); i++) {
+		wchar_t _char = desc[i];
+		auto it = replacementMap.find(_char);
+
+		if (it != replacementMap.end()) finalString += it->second;
+		else finalString += _char;
+	}
+
+	return finalString;
+}
+
+wstring CMinecraftApp::FormatChatMessage(const wstring& desc, bool applyColor)
+{
+	static std::wstring_view colorFormatString = L"<font color=\"#%08x\" shadowcolor=\"#%08x\">";
+
+	wstring results = desc;
+	wchar_t replacements[64];
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_0), 0xFFFFFFFF);
+	results = replaceAll(results, L"§0", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_1), 0xFFFFFFFF);
+	results = replaceAll(results, L"§1", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_2), 0xFFFFFFFF);
+	results = replaceAll(results, L"§2", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_3), 0xFFFFFFFF);
+	results = replaceAll(results, L"§3", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_4), 0xFFFFFFFF);
+	results = replaceAll(results, L"§4", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_5), 0xFFFFFFFF);
+	results = replaceAll(results, L"§5", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_6), 0xFFFFFFFF);
+	results = replaceAll(results, L"§6", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_7), 0xFFFFFFFF);
+	results = replaceAll(results, L"§7", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_8), 0xFFFFFFFF);
+	results = replaceAll(results, L"§8", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_9), 0xFFFFFFFF);
+	results = replaceAll(results, L"§9", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_a), 0xFFFFFFFF);
+	results = replaceAll(results, L"§a", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_b), 0xFFFFFFFF);
+	results = replaceAll(results, L"§b", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_c), 0xFFFFFFFF);
+	results = replaceAll(results, L"§c", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_d), 0xFFFFFFFF);
+	results = replaceAll(results, L"§d", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_e), 0xFFFFFFFF);
+	results = replaceAll(results, L"§e", replacements);
+
+	swprintf(replacements, 64, (applyColor ? colorFormatString.data() : L""), GetHTMLColour(eHTMLColor_f), 0xFFFFFFFF);
+	results = replaceAll(results, L"§f", replacements);
+
+	return results;
+}
+
 wstring CMinecraftApp::GetActionReplacement(int iPad, unsigned char ucAction)
 {
 	unsigned int input = InputManager.GetGameJoypadMaps(InputManager.GetJoypadMapVal(iPad) ,ucAction);
@@ -8103,6 +8356,16 @@ void CMinecraftApp::SetGameHostOption(unsigned int &uiHostSettings, eGameHostOpt
 		uiHostSettings&=~GAME_HOST_OPTION_BITMASK_WORLDSIZE;
 		uiHostSettings|=(GAME_HOST_OPTION_BITMASK_WORLDSIZE & (uiVal<<GAME_HOST_OPTION_BITMASK_WORLDSIZE_BITSHIFT));
 		break;
+	case eGameHostOption_Hardcore: // 4J Added - for hardcore mode
+		if(uiVal!=0)
+		{
+			uiHostSettings |= GAME_HOST_OPTION_BITMASK_HARDCORE;
+		}
+		else
+		{
+			uiHostSettings &= ~GAME_HOST_OPTION_BITMASK_HARDCORE;
+		}
+		break;
 	case eGameHostOption_All:
 		uiHostSettings=uiVal;
 		break;
@@ -8203,6 +8466,9 @@ unsigned int CMinecraftApp::GetGameHostOption(unsigned int uiHostSettings, eGame
 		return !(uiHostSettings&GAME_HOST_OPTION_BITMASK_NATURALREGEN);
 	case eGameHostOption_DoDaylightCycle:
 		return !(uiHostSettings&GAME_HOST_OPTION_BITMASK_DODAYLIGHTCYCLE);
+		break;
+	case eGameHostOption_Hardcore: // 4J Added - for hardcore mode
+		return (uiHostSettings&GAME_HOST_OPTION_BITMASK_HARDCORE) ? 1 : 0;
 		break;
 	}
 

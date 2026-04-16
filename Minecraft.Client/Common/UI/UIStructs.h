@@ -257,11 +257,14 @@ typedef struct _SaveListDetails
 #endif
 #endif
 
+	bool isHardcore;
+
 	_SaveListDetails()
 	{
 		saveId = 0;
 		pbThumbnailData = nullptr;
 		dwThumbnailSize = 0;
+		isHardcore = false;
 #ifdef _DURANGO
 		ZeroMemory(UTF16SaveName,sizeof(wchar_t)*128);
 		ZeroMemory(UTF16SaveFilename,sizeof(wchar_t)*MAX_SAVEFILENAME_LENGTH);

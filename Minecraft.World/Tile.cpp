@@ -23,6 +23,8 @@
 
 
 
+bool g_suppressExpDrops = false;
+
 wstring Tile::TILE_DESCRIPTION_PREFIX = L"Tile.";
 
 const float Tile::INDESTRUCTIBLE_DESTROY_TIME = -1.0f;
@@ -1064,6 +1066,7 @@ void Tile::popResource(Level *level, int x, int y, int z, shared_ptr<ItemInstanc
 // Brought forward for TU7
 void Tile::popExperience(Level *level, int x, int y, int z, int amount)
 {
+    if (g_suppressExpDrops) return;
 	if (!level->isClientSide)
 	{
 		while (amount > 0)

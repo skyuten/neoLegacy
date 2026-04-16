@@ -92,6 +92,11 @@ protected:
 	float lastHurt;
 	bool jumping;
 
+	// DO NOT ADD IFDEF HERE!!
+	// causes memroy layout disagreement. Not good
+	int fourKitDeathExp;
+	bool fourKitDeathExpSet;
+
 public:
 	float xxa;
 	float yya;
@@ -185,6 +190,7 @@ public:
 	virtual void knockback(shared_ptr<Entity> source, float dmg, double xd, double zd);
 
 protected:
+	virtual int getCriticalSound();
 	virtual int getHurtSound();
 	virtual int getDeathSound();
 

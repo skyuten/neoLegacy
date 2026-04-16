@@ -46,7 +46,7 @@ void EntityIO::staticCtor()
 {
 	setId(ItemEntity::create, eTYPE_ITEMENTITY,  L"Item", 1);
 	setId(ExperienceOrb::create, eTYPE_EXPERIENCEORB, L"XPOrb", 2);
-	setId(Guardian::create, eTYPE_ELDER_GUARDIAN, L"ElderGuardian", 4, eMinecraftColour_Mob_ElderGuardian_Colour1, eMinecraftColour_Mob_ElderGuardian_Colour2, IDS_GUARDIAN_ELDER);
+	setId(Guardian::create, eTYPE_ELDER_GUARDIAN, L"ElderGuardian", 4, eMinecraftColour_Mob_ElderGuardian_Colour1, eMinecraftColour_Mob_ElderGuardian_Colour2, IDS_ELDER_GUARDIAN);
 	setId(LeashFenceKnotEntity::create, eTYPE_LEASHFENCEKNOT, L"LeashKnot", 8);
 	setId(Painting::create, eTYPE_PAINTING, L"Painting", 9);
 	setId(Arrow::create, eTYPE_ARROW, L"Arrow", 10);

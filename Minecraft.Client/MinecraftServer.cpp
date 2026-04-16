@@ -34,6 +34,9 @@
 #ifdef _WINDOWS64
 #include "Windows64/Network/WinsockNetLayer.h"
 #endif
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+#include "../Minecraft.Server/ServerLogger.h"
+#endif
 #include <sstream>
 #ifdef SPLIT_SAVES
 #include "../Minecraft.World/ConsoleSaveFileSplit.h"
@@ -561,6 +564,7 @@ MinecraftServer::MinecraftServer()
 	m_serverPausedEvent = new C4JThread::Event;
 
 	m_saveOnExit = false;
+	m_deleteWorldOnExit = false;
 	m_suspending = false;
 
 	m_ugcPlayersVersion = 0;
@@ -734,10 +738,13 @@ bool MinecraftServer::initServer(int64_t seed, NetworkGameInitData *initData, DW
 
 	if( findSeed )
 	{
+		int worldSizeChunks = (initData && initData->xzSize > 0) ? (int)initData->xzSize : 54;
 #ifdef __PSVITA__
-		seed = BiomeSource::findSeed(pLevelType, &running);
+		seed = BiomeSource::findSeed(pLevelType, &running, worldSizeChunks);
 #else
-		seed = BiomeSource::findSeed(pLevelType);
+	    // LordCambion changes removed the worldSizeChunks param from BiomeSource#findSeed
+		// seed = BiomeSource::findSeed(pLevelType, worldSizeChunks);
+	    seed = BiomeSource::findSeed(pLevelType);
 #endif
 	}
 
@@ -887,6 +894,15 @@ bool MinecraftServer::loadLevel(LevelStorageSource *storageSource, const wstring
 	//    }
 	ProgressRenderer *mcprogress = Minecraft::GetInstance()->progressRenderer;
 
+	// 4J Added - store save folder name for potential hardcore world deletion
+	{
+		char szSaveFolder[MAX_SAVEFILENAME_LENGTH] = {};
+		StorageManager.GetSaveUniqueFilename(szSaveFolder);
+		wchar_t wSaveFolder[MAX_SAVEFILENAME_LENGTH] = {};
+		mbstowcs(wSaveFolder, szSaveFolder, MAX_SAVEFILENAME_LENGTH - 1);
+		m_saveFolderName = wSaveFolder;
+	}
+
 	// 4J TODO - free levels here if there are already some?
 	levels = ServerLevelArray(3);
 
@@ -996,6 +1012,12 @@ bool MinecraftServer::loadLevel(LevelStorageSource *storageSource, const wstring
 		levels[i]->setSpawnSettings(GetDedicatedServerBool(settings, L"spawn-monsters", true), animals);
 #endif
 		levels[i]->getLevelData()->setGameType(gameType);
+
+#ifdef MINECRAFT_SERVER_BUILD
+		// Dedicated server: server.properties hardcore flag is authoritative
+		levels[i]->getLevelData()->setHardcore(isHardcore());
+#endif
+		// Offline/client-hosted: keep the world's saved hardcore flag from NBT
 
 		if(app.getLevelGenerationOptions() != nullptr)
 		{
@@ -1642,7 +1664,7 @@ bool MinecraftServer::isNetherEnabled()
 
 bool MinecraftServer::isHardcore()
 {
-	return false;
+	return app.GetGameHostOption(eGameHostOption_Hardcore) > 0;
 }
 
 int MinecraftServer::getOperatorUserPermissionLevel()
@@ -1795,7 +1817,6 @@ void MinecraftServer::run(int64_t seed, void *lpParameter)
 
                         chunkPacketManagement_PostTick();
                     }
-                    lastTime = getCurrentTimeMillis();
                     //					int64_t afterall = System::currentTimeMillis();
                     //					PIXReportCounter(L"Server time all",(float)(afterall-beforeall));
                     //					PIXReportCounter(L"Server ticks",(float)tickcount);
@@ -1864,10 +1885,22 @@ void MinecraftServer::run(int64_t seed, void *lpParameter)
                         QueryPerformanceCounter(&qwTime);
 #endif
 
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+                        LARGE_INTEGER asTicksPerSec, asT0, asT1;
+                        QueryPerformanceFrequency(&asTicksPerSec);
+                        double asSecsPerTick = 1.0 / (double)asTicksPerSec.QuadPart;
+                        QueryPerformanceCounter(&asT0);
+                        LARGE_INTEGER asAfterPlayers, asAfterLevels, asAfterRules, asAfterFlush;
+#endif
+
                         if (players != nullptr)
                         {
                             players->saveAll(nullptr);
                         }
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+                        QueryPerformanceCounter(&asAfterPlayers);
+#endif
 
                         for (unsigned int j = 0; j < levels.length; j++)
                         {
@@ -1884,6 +1917,11 @@ void MinecraftServer::run(int64_t seed, void *lpParameter)
                             PIXEndNamedEvent();
 #endif
                         }
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+                        QueryPerformanceCounter(&asAfterLevels);
+#endif
+
                         if (!s_bServerHalted)
                         {
 #if defined(_XBOX_ONE) || defined(__ORBIS__)
@@ -1895,7 +1933,24 @@ void MinecraftServer::run(int64_t seed, void *lpParameter)
 
                             PIXBeginNamedEvent(0, "Save to disc");
 #endif
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+                            QueryPerformanceCounter(&asAfterRules);
+#endif
+
                             levels[0]->saveToDisc(Minecraft::GetInstance()->progressRenderer, true);
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+                            QueryPerformanceCounter(&asAfterFlush);
+                            ServerRuntime::LogInfof("world-io",
+                                "autosave breakdown: players=%.0fms levels=%.0fms rules=%.0fms flush=%.0fms total=%.0fms",
+                                (asAfterPlayers.QuadPart - asT0.QuadPart) * asSecsPerTick * 1000.0,
+                                (asAfterLevels.QuadPart - asAfterPlayers.QuadPart) * asSecsPerTick * 1000.0,
+                                (asAfterRules.QuadPart - asAfterLevels.QuadPart) * asSecsPerTick * 1000.0,
+                                (asAfterFlush.QuadPart - asAfterRules.QuadPart) * asSecsPerTick * 1000.0,
+                                (asAfterFlush.QuadPart - asT0.QuadPart) * asSecsPerTick * 1000.0);
+#endif
+
 #if defined(_XBOX_ONE) || defined(__ORBIS__)
                             PIXEndNamedEvent();
 #endif
@@ -2348,36 +2403,7 @@ void MinecraftServer::chunkPacketManagement_PreTick()
 	s_tickStartTime = System::currentTimeMillis();
 	s_sentTo.clear();
 
-	vector< shared_ptr<PlayerConnection> > *players = connection->getPlayers();
-
-	if( players->size() )
-	{
-		vector< shared_ptr<PlayerConnection> > playersOrig = *players;
-		players->clear();
-
-		do
-		{
-			int longestTime = 0;
-			auto playerConnectionBest = playersOrig.begin();
-			for( auto it = playersOrig.begin(); it != playersOrig.end(); it++)
-			{
-				int thisTime = 0;
-				INetworkPlayer *np = (*it)->getNetworkPlayer();
-				if( np )
-				{
-					thisTime = np->GetTimeSinceLastChunkPacket_ms();
-				}
-
-				if( thisTime > longestTime )
-				{
-					playerConnectionBest = it;
-					longestTime = thisTime;
-				}
-			}
-			players->push_back(*playerConnectionBest);
-			playersOrig.erase(playerConnectionBest);
-		} while ( playersOrig.size() > 0 );
-	}
+	connection->sortPlayersByChunkPriority();
 }
 
 void MinecraftServer::chunkPacketManagement_PostTick()

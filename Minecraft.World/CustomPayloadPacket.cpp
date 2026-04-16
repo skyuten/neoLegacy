@@ -14,7 +14,19 @@ const wstring CustomPayloadPacket::SET_ADVENTURE_COMMAND_PACKET = L"MC|AdvCdm";
 const wstring CustomPayloadPacket::SET_BEACON_PACKET = L"MC|Beacon";
 const wstring CustomPayloadPacket::SET_ITEM_NAME_PACKET = L"MC|ItemName";
 
+const wstring CustomPayloadPacket::CIPHER_KEY_CHANNEL = L"MC|CKey";
+const wstring CustomPayloadPacket::CIPHER_ACK_CHANNEL = L"MC|CAck";
+const wstring CustomPayloadPacket::CIPHER_ON_CHANNEL = L"MC|COn";
+
+const wstring CustomPayloadPacket::IDENTITY_TOKEN_ISSUE = L"MC|CTIssue";
+const wstring CustomPayloadPacket::IDENTITY_TOKEN_CHALLENGE = L"MC|CTChallenge";
+const wstring CustomPayloadPacket::IDENTITY_TOKEN_RESPONSE = L"MC|CTResponse";
+
+const wstring CustomPayloadPacket::FORK_HELLO_CHANNEL = L"MC|ForkHello";
+const wstring CustomPayloadPacket::FORK_PLAYER_LEAVE_CHANNEL = L"MC|ForkPLeave";
+
 CustomPayloadPacket::CustomPayloadPacket()
+	: length(0)
 {
 }
 
@@ -22,6 +34,7 @@ CustomPayloadPacket::CustomPayloadPacket(const wstring &identifier, byteArray da
 {
 	this->identifier = identifier;
 	this->data = data;
+	this->length = 0;
 
 	if (data.data != nullptr)
 	{

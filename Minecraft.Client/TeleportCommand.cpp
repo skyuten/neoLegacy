@@ -8,6 +8,9 @@
 #include "../Minecraft.World/net.minecraft.world.level.h"
 #include "../Minecraft.World/net.minecraft.world.level.dimension.h"
 #include "TeleportCommand.h"
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+#include "../Minecraft.Server/FourKitBridge.h"
+#endif
 
 EGameCommand TeleportCommand::getId()
 {
@@ -32,7 +35,21 @@ void TeleportCommand::execute(shared_ptr<CommandSender> source, byteArray comman
 	if(subject != nullptr && destination != nullptr && subject->level->dimension->id == destination->level->dimension->id && subject->isAlive() )
 	{
 		subject->ride(nullptr);
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+		{
+			double outX, outY, outZ;
+			bool cancelled = FourKitBridge::FirePlayerTeleport(subject->entityId,
+				subject->x, subject->y, subject->z, subject->dimension,
+				destination->x, destination->y, destination->z, destination->dimension,
+				1 /* COMMAND */,
+				&outX, &outY, &outZ);
+			if (cancelled)
+				return;
+			subject->connection->teleport(outX, outY, outZ, destination->yRot, destination->xRot);
+		}
+#else
 		subject->connection->teleport(destination->x, destination->y, destination->z, destination->yRot, destination->xRot);
+#endif
 		//logAdminAction(source, "commands.tp.success", subject->getAName(), destination->getAName());
 		logAdminAction(source, ChatPacket::e_ChatCommandTeleportSuccess, subject->getName(), eTYPE_SERVERPLAYER, destination->getName());
 
