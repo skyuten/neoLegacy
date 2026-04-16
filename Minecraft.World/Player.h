@@ -32,6 +32,11 @@ class Merchant;
 class PlayerEnderChestContainer;
 class GameType;
 class Scoreboard;
+struct EnchantmentEntry {
+	int level;
+	int id;
+};
+
 
 class Player : public LivingEntity, public CommandSender, public ScoreHolder
 {
@@ -67,6 +72,7 @@ public:
 	AbstractContainerMenu *inventoryMenu;
 	AbstractContainerMenu *containerMenu;
 	int enchantmentSeed = 0;
+	vector<EnchantmentEntry> enchantmentEntries = vector<EnchantmentEntry>(3);
 
 protected:
 	FoodData foodData;

@@ -31,6 +31,12 @@ public:
 	static const wstring FORK_HELLO_CHANNEL;         // server->client: identifies fork server (empty payload)
 	static const wstring FORK_PLAYER_LEAVE_CHANNEL;  // server->client: player disconnected (payload: UTF gamertag)
 
+	// Fixes for MP related crashes
+	static const wstring QUICK_EQUIP_PACKET;
+	static const wstring QUICK_EQUIP_SERVER_PACKET;
+
+	static const wstring ENCHANTMENT_LIST_PACKET;
+
 	wstring identifier;
 	int length;
 	byteArray data;

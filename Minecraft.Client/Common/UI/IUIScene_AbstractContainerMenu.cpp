@@ -14,7 +14,9 @@
 #include "../../PlayerList.h"
 #include "../../Minecraft.h"
 #include "../../Options.h"
-
+#include "../../Minecraft.World/Level.h"
+#include "../../MultiplayerLevel.h"
+#include "../../../Minecraft.World/Enchantment.h"
 #ifdef __ORBIS__
 #include <pad.h>
 #endif
@@ -270,45 +272,45 @@ void IUIScene_AbstractContainerMenu::UpdateTooltips()
 }
 
 void IUIScene_AbstractContainerMenu::handleEnchantButton(int slot, int iPad) {
-	UIScene* t = ui.FindScene(eUIScene_EnchantingMenu);
-	MinecraftServer* aMinecraft = MinecraftServer::getInstance();
-	EnchantmentMenu* menu = dynamic_cast<EnchantmentMenu*>(aMinecraft->getPlayers()->players[iPad]->containerMenu);
+	EnchantmentMenu* menu = new EnchantmentMenu(Minecraft::GetInstance()->player->inventory, dynamic_cast<Level*>(Minecraft::GetInstance()->level), 0, 0, 0);
+	if (0 == 0) { //uhh don't worry that is temporary
+		int lapisCost = slot + 1; // slot 0 = 1 lapis, slot 1 = 2, slot 2 = 3
 
-	if (menu->en == false && menu->cachedEnchantments[slot] != nullptr) {
-		EnchantmentInstance* a = menu->cachedEnchantments[slot]->at(0);
-		if (a != nullptr) {
-			int lapisCost = slot + 1; // slot 0 = 1 lapis, slot 1 = 2, slot 2 = 3
+		Minecraft* pMinecraft = Minecraft::GetInstance();
+		auto player = pMinecraft->player;
+		EnchantmentMenu* menu = dynamic_cast<EnchantmentMenu*>(player->containerMenu);
+		HtmlString title = HtmlString(
+			wstring(app.GetString(Enchantment::enchantments[player->enchantmentEntries[slot].id]->getDescriptionId())) +
+			L" " +
+			Enchantment::enchantments[player->enchantmentEntries[slot].id]->getLevelString(player->enchantmentEntries[slot].level) +
+			L"...?",
+			eHTMLColor_White
+		);
 
-			HtmlString title = HtmlString(
-				wstring(app.GetString(a->enchantment->enchantments[a->enchantment->id]->getDescriptionId())) +
-				L" " +
-				a->enchantment->enchantments[a->enchantment->id]->getLevelString(a->level) +
-				L"...?",
-				eHTMLColor_White
-			);
+		bool costEnough = Minecraft::GetInstance()->player->experienceLevel >= menu->costs[slot];
+		bool enough = menu->getLapisCount() >= lapisCost;
+		eMinecraftColour col = enough ? eHTMLColor_7 : eHTMLColor_c;
+		eMinecraftColour colCost = costEnough ? eHTMLColor_7 : eHTMLColor_c;
 
-			bool costEnough = aMinecraft->getPlayers()->players[iPad]->experienceLevel >= menu->costs[slot];
-			bool enough = menu->getLapisCount() >= lapisCost;
-			eMinecraftColour col = enough ? eHTMLColor_7 : eHTMLColor_c;
-			eMinecraftColour colCost = costEnough ? eHTMLColor_7 : eHTMLColor_c;
+		std::wstring message = costEnough
+						? std::to_wstring(slot + 1) + (slot == 0 ? L" Enchantment Level" : L" Enchantment Levels")
+						: L"Level Requirement: " + std::to_wstring(menu->costs[slot]);
 
-			std::wstring message = costEnough
-				? std::to_wstring(slot + 1) + (slot == 0 ? L" Enchantment Level" : L" Enchantment Levels")
-				: L"Level Requirement: " + std::to_wstring(menu->costs[slot]);
+		vector<HtmlString>* lines = new vector<HtmlString>();
+		lines->push_back(title);
 
-			vector<HtmlString>* lines = new vector<HtmlString>();
-			lines->push_back(title);
-			if (!aMinecraft->getPlayers()->players[iPad]->abilities.instabuild) {
-				lines->push_back(HtmlString(L"")); // title1 blank line
-				if (costEnough) {
-					lines->push_back(HtmlString(std::to_wstring(lapisCost) + L" Lapis Lazuli", col));
-				}
-				lines->push_back(HtmlString(message, colCost));
+		if (!Minecraft::GetInstance()->player->abilities.instabuild) {
+			lines->push_back(HtmlString(L"")); // title1 blank line
+			if (costEnough) {
+				lines->push_back(HtmlString(std::to_wstring(lapisCost) + L" Lapis Lazuli", col));
 			}
-			SetPointerText(lines, false);
+			lines->push_back(HtmlString(message, colCost));
 		}
+
+		SetPointerText(lines, false);
+		return;
 	}
-	};
+};
 
 void IUIScene_AbstractContainerMenu::onMouseTick()
 {

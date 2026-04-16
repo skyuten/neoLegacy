@@ -51,7 +51,7 @@ public:
 	virtual void setData(int id, int value);
 	virtual void slotsChanged(int a);// 4J used to take a shared_ptr<Container> container but wasn't using it, so removed to simplify things
 	virtual bool clickMenuButton(shared_ptr<Player> player, int i);
-	virtual EnchantmentInstance* predictEnchantment(shared_ptr<Player> player, int i);
+	virtual EnchantmentInstance* predictEnchantment(Player* player, int i);
 	void removed(shared_ptr<Player> player);
 	virtual bool stillValid(shared_ptr<Player> player);
 	virtual shared_ptr<ItemInstance> quickMoveStack(shared_ptr<Player> player, int slotIndex);

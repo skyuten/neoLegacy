@@ -3997,6 +3997,36 @@ void ClientConnection::handleCustomPayload(shared_ptr<CustomPayloadPacket> custo
 			trader->overrideOffers(recipeList);
 		}
 	}
+	else if (CustomPayloadPacket::ENCHANTMENT_LIST_PACKET.compare(customPayloadPacket->identifier) == 0) {
+		ByteArrayInputStream bais(customPayloadPacket->data);
+		DataInputStream input(&bais);
+		bool done = false;
+		int l = 0;
+		bool firstInGroup = true;
+		EnchantmentEntry temp;
+		//int firstAmount = input.readInt();
+		while (!done) {
+			int a = input.readInt();
+			if (a == -1) {
+				minecraft->localplayers[m_userIndex]->enchantmentEntries[l] = temp;
+				l++;
+				firstInGroup = true;
+			}
+			else if (a == -2) {
+				done = true;
+			}
+			else {
+				if (firstInGroup) {
+					temp.id = a;
+					temp.level = input.readInt();
+					firstInGroup = false;
+				}
+				else {
+					input.readInt();
+				}
+			}
+		}
+	}
 }
 
 Connection *ClientConnection::getConnection()
