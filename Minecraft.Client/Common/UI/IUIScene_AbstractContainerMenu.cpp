@@ -275,10 +275,13 @@ void IUIScene_AbstractContainerMenu::handleEnchantButton(int slot, int iPad) {
 	EnchantmentMenu* menu = new EnchantmentMenu(Minecraft::GetInstance()->player->inventory, dynamic_cast<Level*>(Minecraft::GetInstance()->level), 0, 0, 0);
 	if (0 == 0) { //uhh don't worry that is temporary
 		int lapisCost = slot + 1; // slot 0 = 1 lapis, slot 1 = 2, slot 2 = 3
-
+		
 		Minecraft* pMinecraft = Minecraft::GetInstance();
 		auto player = pMinecraft->player;
+		if (player->enchantmentEntries[slot].id == -3) return;
+
 		EnchantmentMenu* menu = dynamic_cast<EnchantmentMenu*>(player->containerMenu);
+
 		HtmlString title = HtmlString(
 			wstring(app.GetString(Enchantment::enchantments[player->enchantmentEntries[slot].id]->getDescriptionId())) +
 			L" " +

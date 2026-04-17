@@ -4015,6 +4015,12 @@ void ClientConnection::handleCustomPayload(shared_ptr<CustomPayloadPacket> custo
 			else if (a == -2) {
 				done = true;
 			}
+			else if (a == -4) {
+				for (int i = 0; i < 3; i++) {
+					minecraft->localplayers[m_userIndex]->enchantmentEntries[i].id = -3;
+				}
+				done = true;
+			}
 			else {
 				if (firstInGroup) {
 					temp.id = a;

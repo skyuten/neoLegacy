@@ -216,6 +216,8 @@ bool PlayerList::placeNewPlayer(Connection *connection, shared_ptr<ServerPlayer>
 #endif
 		// 4J Added - Give every player a map the first time they join a server
 		player->inventory->setItem( 9, std::make_shared<ItemInstance>(Item::emptyMap_Id, 1, level->getAuxValueForMap(player->getXuid(), 0, centreXC, centreZC, mapScale)));
+		Random* r = new Random();
+		player->enchantmentSeed = r->nextInt(1000000); //Randomise enchantment seed upon joining server
 		if(app.getGameRuleDefinitions() != nullptr)
 		{
 			app.getGameRuleDefinitions()->postProcessPlayer(player);

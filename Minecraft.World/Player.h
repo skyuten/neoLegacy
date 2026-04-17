@@ -34,7 +34,7 @@ class GameType;
 class Scoreboard;
 struct EnchantmentEntry {
 	int level;
-	int id;
+	int id = -3;
 };
 
 
