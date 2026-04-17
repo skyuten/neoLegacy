@@ -136,31 +136,6 @@ int ArmorItem::getUseDuration(shared_ptr<ItemInstance> itemInstance)
 }
 
 shared_ptr<ItemInstance> ArmorItem::use(shared_ptr<ItemInstance> instance, Level* level, shared_ptr<Player> player) {
-	int slot = Mob::getEquipmentSlotForItem(instance) - 1;
-
-	//// If player is in survival mode (not creative)
-	if (!player->abilities.instabuild) { //
-		// Equip the armor to the appropriate slot
-		if (player->inventory->armor[slot] == nullptr) {
-			//player->setEquippedSlot(slot, instance);
-			//player->inventory->removeItemNoUpdate(player->inventory->selected);
-			// Remove the item from hand (set count to 0)
-			//instance->count = 0;
-		}
-		else {
-			//player->inventory->setItem(player->inventory->selected, player->inventory->armor[slot]);
-			//player->setEquippedSlot(slot, instance);
-		}
-	}
-	else {
-		if (player->inventory->armor[slot] == nullptr) {
-			//player->setEquippedSlot(slot, instance);
-		}
-		else {
-			//player->inventory->setItem(player->inventory->selected, player->inventory->armor[slot]);
-			//player->setEquippedSlot(slot, instance);
-		}
-	}
 	ByteArrayOutputStream baos;
 	DataOutputStream dos(&baos);
 	Packet::writeItem(instance, &dos);
