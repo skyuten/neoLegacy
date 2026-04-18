@@ -828,16 +828,14 @@ int __cdecl NativeGetItemMeta(int entityId, int slot, char *outBuf, int bufSize)
         return 0;
 
     CompoundTag *tag = item->getTag();
-    if (!tag || !tag->contains(L"display"))
-        return 0;
-
-    CompoundTag *display = tag->getCompound(L"display");
-    bool hasName = display->contains(L"Name");
-    bool hasLore = display->contains(L"Lore");
 
     bool hasEnchantments = item->isEnchanted();
 
-    if (!hasName && !hasLore)
+    CompoundTag *display = (tag && tag->contains(L"display")) ? tag->getCompound(L"display") : nullptr;
+    bool hasName = display && display->contains(L"Name");
+    bool hasLore = display && display->contains(L"Lore");
+
+    if (!hasName && !hasLore && !hasEnchantments)
         return 0;
 
     int offset = 0;
