@@ -31,6 +31,7 @@ This project is based on Legacy Console Edition v1.6.0560.0 (TU19) with fixes an
 ### Configurable Mob Spawn Caps (Dedicated Server)
 
 - Natural spawn limits are now configurable via `server.properties`. The previously hardcoded limits can be tuned with `max-monsters` (default 50), `max-animals` (50), `max-ambient` (20), `max-water-animals` (5), `max-wolves` (8), `max-chickens` (8), and `max-mushroom-cows` (2). Defaults match the original values so existing servers see no behavior change until you edit the config.
+- Breeding and spawn-egg caps now scale with the configured natural cap. Raising `max-animals` to 100 automatically lifts the breeding cap to 120 and the spawn-egg cap to 140 for that category. Same scaling applies to monsters, ambient, squid, wolves, chickens, and mushroom cows.
 
 ### Bug Fixes
 
