@@ -55,9 +55,11 @@ private:
     bool invisible;
     bool isMarkerFlag;
     bool noPhysics;
+    float standDamage;
 
 public:
     long long lastHit;
+    int hurtDir;
 
     explicit ArmorStand(Level* level);
     virtual ~ArmorStand();

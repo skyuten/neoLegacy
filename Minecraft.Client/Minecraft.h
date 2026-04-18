@@ -79,6 +79,7 @@ private:
 	static void levelTickUpdateFunc(void* pParam);
 	static void levelTickThreadInitFunc();
 
+
 public:
 	int width, height;
 	int width_phys, height_phys; // 4J - added
@@ -122,7 +123,7 @@ public:
 	void storeExtraLocalPlayer(int idx);
 	void updatePlayerViewportAssignments();
 	int unoccupiedQuadrant;	// 4J - added
-
+	ItemInHandRenderer* getItemInHandRenderer() const { return localitemInHandRenderers[localPlayerIdx]; };
 	shared_ptr<LivingEntity> cameraTargetPlayer;
 	shared_ptr<LivingEntity> crosshairPickMob;
 	ParticleEngine *particleEngine;

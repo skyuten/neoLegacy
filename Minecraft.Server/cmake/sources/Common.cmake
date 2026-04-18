@@ -547,6 +547,17 @@ set(_MINECRAFT_SERVER_COMMON_ROOT
   "${_MS_SRC}/../include/lce_filesystem/lce_filesystem.cpp"
   "${_MS_SRC}/Console/ServerCliInput.cpp"
   "${_MS_SRC}/Console/ServerCliInput.h"
+  "${_MS_SRC}/../Minecraft.Client/AbstractArmorLayer.h"
+  "${_MS_SRC}/../Minecraft.Client/AbstractArmorLayer.cpp"
+  "${_MS_SRC}/../Minecraft.Client/HumanoidArmorLayer.h"
+  "${_MS_SRC}/../Minecraft.Client/HumanoidArmorLayer.cpp"
+  "${_MS_SRC}/../Minecraft.Client/ArmorStandArmorModel.h"
+  "${_MS_SRC}/../Minecraft.Client/ArmorStandArmorModel.cpp"
+  "${_MS_SRC}/../Minecraft.Client/ItemInHandLayer.h"
+  "${_MS_SRC}/../Minecraft.Client/ItemInHandLayer.cpp"
+  "${_MS_SRC}/../Minecraft.Client/CustomHeadLayer.h"
+  "${_MS_SRC}/../Minecraft.Client/CustomHeadLayer.cpp"
+  "${_MS_SRC}/../Minecraft.Client/RenderLayer.h"
 )
 source_group("" FILES ${_MINECRAFT_SERVER_COMMON_ROOT})
 

@@ -33,6 +33,7 @@
 #include "../Minecraft.World/SetHealthPacket.h"
 #include "../Minecraft.World/LevelSoundPacket.h"
 #include "../Minecraft.World/LevelParticlesPacket.h"
+#include "../Minecraft.Client/ParticleType.h"
 #include "../Minecraft.World/SetEntityLinkPacket.h"
 #include "../Minecraft.World/SimpleContainer.h"
 #include "../Minecraft.World/Slot.h"
@@ -633,9 +634,6 @@ int __cdecl NativeSendRaw(int entityId, unsigned char *bufferData, int bufferSiz
 
 void WriteInventoryItemData(std::shared_ptr<ItemInstance> item, int index, int* outBuffer) {
     if (item) {
-        //ItemFlags Key:
-        // 0x1 = hasMetadata (has data that needs to be gotten from "ReadMetaFromNative")
-
         uint8_t itemFlags = 0;
         if (item->getTag() == nullptr) goto doneWithMetadataFlag;
         CompoundTag* itemTag = item->getTag();
@@ -644,7 +642,7 @@ void WriteInventoryItemData(std::shared_ptr<ItemInstance> item, int index, int* 
             itemFlags |= 0x1;
             goto doneWithMetadataFlag;
         }
-        else { //we just want to check one tag for metadata and return for this flag, not all of them
+        else {
             CompoundTag* displayTag = itemTag->getCompound(L"display");
             if (displayTag->contains(L"Name") || displayTag->contains(L"Lore")) {
                 itemFlags |= 0x1;
@@ -652,9 +650,7 @@ void WriteInventoryItemData(std::shared_ptr<ItemInstance> item, int index, int* 
             }
         }
 
-
     doneWithMetadataFlag:
-
         outBuffer[(index * 3) + 0] = item->id;
         outBuffer[(index * 3) + 1] = item->getAuxValue();
         outBuffer[(index * 3) + 2] = (((int)itemFlags << 24) | ((int)item->count << 8));
@@ -663,9 +659,6 @@ void WriteInventoryItemData(std::shared_ptr<ItemInstance> item, int index, int* 
 
 void __cdecl NativeGetPlayerInventory(int entityId, int *outData)
 {
-    // 9 slots per row, 3 slots in the inventory and the hotbar, 4 armor slots, 1 hand slot
-    // (((slotsPerRow * Rows) + ArmorSlots) * AmountOfIntsPerSlot) + hand slot
-    // (((9 * 4) + 4) * 3) + 1 = 121
     memset(outData, 0, 121 * sizeof(int));
 
     auto player = FindPlayer(entityId);
@@ -806,8 +799,7 @@ void __cdecl NativeOpenVirtualContainer(int entityId, int nativeType, const char
 
     player->openContainer(container);
 }
-//didnt update this for enchants
-// [nameLen:int32][nameUTF8:bytes][loreCount:int32][lore0Len:int32][lore0UTF8:bytes]
+
 int __cdecl NativeGetItemMeta(int entityId, int slot, char *outBuf, int bufSize)
 {
     auto player = FindPlayer(entityId);
@@ -829,7 +821,6 @@ int __cdecl NativeGetItemMeta(int entityId, int slot, char *outBuf, int bufSize)
     CompoundTag *display = tag->getCompound(L"display");
     bool hasName = display->contains(L"Name");
     bool hasLore = display->contains(L"Lore");
-
     bool hasEnchantments = item->isEnchanted();
 
     if (!hasName && !hasLore)
@@ -888,18 +879,14 @@ int __cdecl NativeGetItemMeta(int entityId, int slot, char *outBuf, int bufSize)
         ListTag<CompoundTag>* list = item->getEnchantmentTags();
         if (list != nullptr) {
             int listSize = list->size();
-
             if ((offset + 4 + (listSize * (4 + 4))) > bufSize) return 0;
-
             memcpy(outBuf + offset, &listSize, 4);
             offset += 4;
             for (int i = 0; i < listSize; i++) {
                 int type = list->get(i)->getShort((wchar_t*)ItemInstance::TAG_ENCH_ID);
                 int level = list->get(i)->getShort((wchar_t*)ItemInstance::TAG_ENCH_LEVEL);
-
                 memcpy(outBuf + offset, &type, 4);
                 offset += 4;
-
                 memcpy(outBuf + offset, &level, 4);
                 offset += 4;
             }
@@ -946,11 +933,8 @@ void __cdecl NativeSetItemMeta(int entityId, int slot, const char *inBuf, int bu
                         item->setTag(nullptr);
                 }
             }
-
             if (tag && tag->contains(L"ench"))
-            {
                 tag->remove(L"ench");
-            }
         }
         return;
     }
@@ -1030,15 +1014,12 @@ void __cdecl NativeSetItemMeta(int entityId, int slot, const char *inBuf, int bu
 
         for (int i = 0; i < enchantCount; i++) {
             if (offset + (4 + 4) > bufSize) break;
-
             int type = 0;
             memcpy(&type, inBuf + offset, 4);
             offset += 4;
-
             int level = 0;
             memcpy(&level, inBuf + offset, 4);
             offset += 4;
-
             CompoundTag* ench = new CompoundTag();
             ench->putShort((wchar_t*)ItemInstance::TAG_ENCH_ID, static_cast<short>(type));
             ench->putShort((wchar_t*)ItemInstance::TAG_ENCH_LEVEL, static_cast<byte>(level));
@@ -1051,9 +1032,7 @@ void __cdecl NativeSetItemMeta(int entityId, int slot, const char *inBuf, int bu
         {
             CompoundTag* tag = item->getTag();
             if (tag && tag->contains(L"ench"))
-            {
                 tag->remove(L"ench");
-            }
         }
     }
 }
@@ -1190,13 +1169,15 @@ void __cdecl NativeSetExhaustion(int entityId, float exhaustion)
     fd->setExhaustion(exhaustion);
 }
 
+
 void __cdecl NativeSpawnParticle(int entityId, int particleId, float x, float y, float z, float offsetX, float offsetY, float offsetZ, float speed, int count)
 {
     auto player = FindPlayer(entityId);
     if (!player || !player->connection) return;
-    wchar_t buf[32];
-    swprintf_s(buf, L"%d", particleId);
-    player->connection->send(std::make_shared<LevelParticlesPacket>(std::wstring(buf), x, y, z, offsetX, offsetY, offsetZ, speed, count));
+    const ParticleType* type = ParticleType::byId(particleId);
+    if (!type) type = ParticleType::getDefault();
+    arrayWithLength<int> noParams = { nullptr, 0 };
+    player->connection->send(std::make_shared<LevelParticlesPacket>(type, false, x, y, z, offsetX, offsetY, offsetZ, speed, count, noParams));
 }
 
 int __cdecl NativeSetPassenger(int entityId, int passengerEntityId)

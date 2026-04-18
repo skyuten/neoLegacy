@@ -35,11 +35,13 @@ void ArmorStand::init()
     registerAttributes();
     defineSynchedData();
 
-    lastHit = 0;
+    lastHit       = -100LL;
+    standDamage   = 0.0f;
+    hurtDir       = 1;
     disabledSlots = 0;
     invisible     = false;
     isMarkerFlag  = false;
-
+    heightOffset = 0.0f;
     for (int i = 0; i < equipmentCount; i++)
         equipment[i] = nullptr;
 
@@ -56,7 +58,6 @@ void ArmorStand::init()
     setSize(0.5f, 1.975f);
 }
 
-
 void ArmorStand::registerAttributes()
 {
     LivingEntity::registerAttributes();
@@ -68,8 +69,7 @@ void ArmorStand::registerAttributes()
 void ArmorStand::defineSynchedData()
 {
     LivingEntity::defineSynchedData();
-    // ArmorStand doesn't inherit from Mob, so we must register
-    // the custom-name fields that Mob::defineSynchedData() normally provides.
+    
     entityData->define(3, static_cast<byte>(0));   // DATA_CUSTOM_NAME_VISIBLE
     entityData->define(2, wstring(L""));            // DATA_CUSTOM_NAME
     entityData->define(DATA_CLIENT_FLAGS,   static_cast<byte>(0));
@@ -193,12 +193,26 @@ void ArmorStand::tick()
 {
     float lockedRot = this->yRot;
     LivingEntity::tick();
-    this->yRot = lockedRot;
-    this->yRotO = lockedRot;       
-    this->yBodyRot = lockedRot;
+    if (onGround)
+    {
+    BlockPos pos((int)floorf(x), (int)floorf(y) - 1, (int)floorf(z));
+    int blockId = level->getTile(pos.getX(), pos.getY(), pos.getZ());
+    if (blockId == Tile::topSnow->id)
+    {
+        int meta = level->getData(pos.getX(), pos.getY(), pos.getZ());
+        float snowHeight = ((meta & 0x7) + 1) * 0.125f;
+        moveTo(x, floorf(y) + snowHeight, z, yRot, xRot);
+    }
+    }
+    this->yRot      = lockedRot;
+    this->yRotO     = lockedRot;
+    this->yBodyRot  = lockedRot;
     this->yBodyRotO = lockedRot;
-    this->yHeadRot = lockedRot;
+    this->yHeadRot  = lockedRot;
     this->yHeadRotO = lockedRot;
+
+    if ((long long)tickCount - lastHit > 20)
+        standDamage = 0.0f;
 
     auto syncPose = [&](int slot, Rotations& local)
     {
@@ -254,6 +268,7 @@ void ArmorStand::causeDamage(float damage)
     h -= damage;
     if (h <= 0.5f)
     {
+        spawnAtLocation(Item::armor_stand_Id, 1);
         brokenByAnything();
         remove();
     }
@@ -266,59 +281,63 @@ void ArmorStand::causeDamage(float damage)
 bool ArmorStand::hurt(DamageSource* source, float damage)
 {
     if (isInvulnerable() || level->isClientSide || removed || isMarker()) return false;
-    if (source != nullptr && source->getMsgId() == eEntityDamageType_Suffocate) return false;
 
-    if (source->isExplosion())
-    {
-        brokenByAnything();
-        remove();
-        return true;
-    }
-
-    bool isFireDamage = source->isFire();
+    if (source->getMsgId() == eEntityDamageType_Suffocate) return false;
 
     if (dynamic_cast<EntityDamageSource*>(source) != nullptr)
     {
-        shared_ptr<Entity> attacker = source->getEntity();
-        if (attacker != nullptr && attacker->instanceof(eTYPE_PLAYER))
-        {
-            if (dynamic_pointer_cast<Player>(attacker)->abilities.instabuild)
-            {
-                level->broadcastEntityEvent(shared_from_this(), (byte)31);
-                remove();
-                return true;
-            }
-        }
+        shared_ptr<Entity> attacker = source->getDirectEntity();
+        if (attacker && attacker->instanceof(eTYPE_PLAYER) &&
+            !dynamic_pointer_cast<Player>(attacker)->isAllowedToHurtEntity(shared_from_this()))
+            return false;
     }
 
-    if (isFireDamage)
+    if (source->isExplosion())
     {
-        float currentHealth = this->getHealth() - 0.15f;
-        this->setHealth(currentHealth);
-        if (currentHealth <= 0.5f)
-        {
-            brokenByAnything();
-            remove();
-            return true;
-        }
-        return false;
-    }
-
-    long long now = (long long)tickCount;
-    if (now - lastHit > 5)
-    {
-        level->broadcastEntityEvent(shared_from_this(), (byte)32);
-        lastHit = now;
-        return true;
-    }
-    else
-    {
-        level->broadcastEntityEvent(shared_from_this(), (byte)31);
         spawnAtLocation(Item::armor_stand_Id, 1);
         brokenByAnything();
         remove();
         return true;
     }
+
+    if (dynamic_cast<EntityDamageSource*>(source) != nullptr)
+    {
+        shared_ptr<Entity> attacker = source->getEntity();
+        if (attacker && attacker->instanceof(eTYPE_PLAYER) &&
+            dynamic_pointer_cast<Player>(attacker)->abilities.instabuild)
+        {
+            level->broadcastEntityEvent(shared_from_this(), (byte)31);
+            remove();
+            return true;
+        }
+    }
+
+    if (source->isFire())
+    {
+        if (isInWater()) return false;
+        float h = getHealth() - 0.15f;
+        setHealth(h);
+        if (h <= 0.5f)
+        {
+            brokenByAnything();
+            remove();
+        }
+        return false;
+    }
+
+    hurtDir = -hurtDir;
+    standDamage += damage * 10.0f;
+    lastHit = (long long)tickCount;
+    level->broadcastEntityEvent(shared_from_this(), (byte)32);
+
+    if (standDamage >= 40.0f)
+    {
+        spawnAtLocation(Item::armor_stand_Id, 1);
+        brokenByAnything();
+        remove();
+    }
+
+    return true;
 }
 
 

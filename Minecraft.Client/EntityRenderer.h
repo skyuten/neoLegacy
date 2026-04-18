@@ -21,6 +21,7 @@ class Font;
 // 4J - this was originally a generic of type EntityRenderer<T extends Entity>
 class EntityRenderer
 {
+	friend class CustomHeadLayer;
 	friend class PlayerRenderer; // 4J Added to allow PlayerRenderer to call renderShadow
 protected:
 	EntityRenderDispatcher *entityRenderDispatcher;

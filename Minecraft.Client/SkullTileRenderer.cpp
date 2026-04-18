@@ -48,31 +48,13 @@ void SkullTileRenderer::renderSkull(float x, float y, float z, int face, float r
 		break;
 	case SkullTileEntity::TYPE_ZOMBIE:
 		bindTexture(&ZOMBIE_LOCATION);
-		//model = zombieModel;
+		model = skeletonModel;
 		break;
 	case SkullTileEntity::TYPE_CHAR:
 	{
 		Textures *textures = Minecraft::GetInstance()->textures;
-
-		if (getHeight(&PlayerRenderer::DEFAULT_LOCATION) == 64)
-		{
-			model = new SkeletonHeadModel(0, 0, 64, 64);
-		}
-		//if (!extra.empty())
-		//{
-		//	wstring url = "http://skins.minecraft.net/MinecraftSkins/" + StringUtil.stripColor(extra) + ".png";
-
-		//	if (!instance->tileEntityRenderDispatcher->textures->hasHttpTexture(url))
-		//	{
-		//		instance->tileEntityRenderDispatcher->textures->addHttpTexture(url, new MobSkinTextureProcessor());
-		//	}
-
-		//	bindTexture(url, "/mob/char.png");
-		//}
-		//else
-		{
-			bindTexture(&PlayerRenderer::DEFAULT_LOCATION);
-		}
+		model = zombieModel;
+		bindTexture(&PlayerRenderer::DEFAULT_LOCATION);
 		break;
 	}
 	case SkullTileEntity::TYPE_CREEPER:

@@ -32,7 +32,7 @@ void ArmorStandArmorModel::setupAnim(float time, float r, float bob,
     Rotations ll = stand->getLeftLegPose();
     Rotations rl = stand->getRightLegPose();
 
-   
+  
     head->xRot = DEG_TO_RAD * h.getX();
     head->yRot = DEG_TO_RAD * h.getY();
     head->zRot = DEG_TO_RAD * h.getZ();

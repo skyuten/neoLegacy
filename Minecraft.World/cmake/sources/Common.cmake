@@ -433,6 +433,8 @@ set(_MINECRAFT_WORLD_COMMON_NET_MINECRAFT_NETWORK_PACKET
   "${CMAKE_CURRENT_SOURCE_DIR}/XZPacket.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/XZPacket.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/net.minecraft.network.packet.h"
+   "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Client/ParticleType.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../Minecraft.Client/ParticleType.cpp"
 )
 source_group("net/minecraft/network/packet" FILES ${_MINECRAFT_WORLD_COMMON_NET_MINECRAFT_NETWORK_PACKET})
 

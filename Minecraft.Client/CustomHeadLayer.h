@@ -3,16 +3,17 @@
 
 class ModelPart;
 class LivingEntity;
+class LivingEntityRenderer;
 
 class CustomHeadLayer : public RenderLayer {
 public:
-    
-    ModelPart* headPart;
+    ModelPart*            headPart;
+    LivingEntityRenderer* parentRenderer;
 
-    explicit CustomHeadLayer(ModelPart* headPart);
+    CustomHeadLayer(ModelPart* headPart, LivingEntityRenderer* parentRenderer);
     virtual ~CustomHeadLayer() {}
 
-    virtual int  colorsOnDamage() override;   
+    virtual int  colorsOnDamage() override;
     virtual void render(shared_ptr<LivingEntity> mob,
                         float wp, float ws, float bob,
                         float headRot, float headRotX,
