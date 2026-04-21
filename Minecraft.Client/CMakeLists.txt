@@ -89,16 +89,10 @@ if(MINECRAFT_CLIENT_USE_4J_DEBUG_LIBS)
     XInput9_1_0
     wsock32
     legacy_stdio_definitions
-    $<$<CONFIG:Debug>:
-      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Input_d.lib"
-      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Storage_d.lib"
-      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Render_PC_d.lib"
-    >
-    $<$<NOT:$<CONFIG:Debug>>:
-      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Input.lib"
-      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Storage.lib"
-      "${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_NAME}/4JLibs/libs/4J_Render_PC.lib"
-    >
+    4JLibs.${PLATFORM_NAME}.Input
+    4JLibs.${PLATFORM_NAME}.Profile
+    4JLibs.${PLATFORM_NAME}.Storage
+    4JLibs.${PLATFORM_NAME}.Render
   )
 else()
   target_link_libraries(Minecraft.Client PRIVATE
