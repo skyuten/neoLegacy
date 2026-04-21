@@ -589,10 +589,25 @@ bool WindowsLeaderboardManager::ReadLocalStats(LeaderboardReadListener* callback
 	for (size_t i = 0; i < allRows.size(); ++i)
 		allRows[i].m_rank = static_cast<unsigned long>(i + 1);
 
+	size_t playerIndex = 0;
+	for (size_t i = 0; i < allRows.size(); ++i)
+	{
+		if (RowMatchesPlayer(allRows[i], localScore))
+		{
+			playerIndex = i;
+			break;
+		}
+	}
+
 	size_t pageStart = 0;
 	size_t pageCount = allRows.size();
 
-	if (m_eFilterMode == eFM_TopRank)
+	if (m_eFilterMode == eFM_MyScore)
+	{
+		pageStart = playerIndex;
+		pageCount = 1;
+	}
+	else if (m_eFilterMode == eFM_TopRank)
 	{
 		if (m_startIndex > 0)
 			pageStart = std::min<size_t>(static_cast<size_t>(m_startIndex - 1), allRows.size());
@@ -600,28 +615,6 @@ bool WindowsLeaderboardManager::ReadLocalStats(LeaderboardReadListener* callback
 		pageCount = allRows.size() - pageStart;
 		if (m_readCount > 0)
 			pageCount = std::min<size_t>(pageCount, static_cast<size_t>(m_readCount));
-	}
-	else if (m_eFilterMode == eFM_MyScore && m_readCount > 0 && allRows.size() > m_readCount)
-	{
-		size_t playerIndex = 0;
-		for (size_t i = 0; i < allRows.size(); ++i)
-		{
-			if (RowMatchesPlayer(allRows[i], localScore))
-			{
-				playerIndex = i;
-				break;
-			}
-		}
-
-		const size_t windowSize = static_cast<size_t>(m_readCount);
-		const size_t halfWindow = windowSize / 2;
-		pageStart = (playerIndex > halfWindow) ? (playerIndex - halfWindow) : 0;
-
-		const size_t maxStart = allRows.size() - windowSize;
-		if (pageStart > maxStart)
-			pageStart = maxStart;
-
-		pageCount = windowSize;
 	}
 
 	std::vector<ReadScore> pageRows;
@@ -643,9 +636,12 @@ bool WindowsLeaderboardManager::ReadLocalStats(LeaderboardReadListener* callback
 
 	view.m_numQueries = static_cast<unsigned int>(pageRows.size());
 	view.m_queries = pageRows.data();
+	const int totalResults = (m_eFilterMode == eFM_MyScore)
+		? static_cast<int>(pageRows.size())
+		: static_cast<int>(allRows.size());
 	callback->OnStatsReadComplete(
 		eStatsReturn_Success,
-		static_cast<int>(allRows.size()),
+		totalResults,
 		view);
 
 	return true;
