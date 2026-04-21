@@ -306,9 +306,6 @@ jobs:
           - I would recommend to set your username prior to launch (create a file called `username.txt`, put your desired username into the file, and save).
           - To play, simply run `Minecraft.Client.exe`.
           
-          **For those that wish to update their existing installation with the latest build:**
-          - Download `Minecraft.Client.exe` and `Minecraft.Client.pdb` and copy them over to your existing neoLegacyWindows64 build (overwrite your old version of Minecraft.Client.exe and Minecraft.Client.pdb).
-          
           **Steam Deck & Linux:**
           - Y'all know the drill. Download the `neoLegacyWindows64.zip`, extract it, add the `Minecraft.Client.exe` as a "Non-Steam Game" within the Steam library, turn on compatibility mode with Proton Experimental, and then run it!
           
@@ -327,13 +324,6 @@ jobs:
             - Local Port: `25565`
             - Proxy Protocol: `None`
           - After creating your tunnel, navigate to the "Tunnels" main page. You'll see the IP address and port for your tunnel. This is what your friends will input when adding your server in order to join your online game!
-          
-          
-          # Why this fork exists:
-          Changes/additions that stray from the upstream repo (`smartcmd/MinecraftConsoles`:
-          - See: https://github.com/itsRevela/MinecraftConsoles?tab=readme-ov-file#latest
-          - I can tweak this fork while staying compatible with the upstream repo without needing to wait on my pull requests to get accepted upstream (while keeping this fork updated with the latest and greatest from upstream)
-          NOTES
 
       - name: Create release
         env:
