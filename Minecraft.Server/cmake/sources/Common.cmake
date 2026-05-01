@@ -252,6 +252,8 @@ set(_MINECRAFT_SERVER_COMMON_ROOT
   "${_MS_SRC}/../Minecraft.Client/Common/UI/UIControl_AchievementsList.h"
   "${_MS_SRC}/../Minecraft.Client/Common/UI/IUIScene_ClassicCraftingMenu.cpp"
   "${_MS_SRC}/../Minecraft.Client/Common/UI/IUIScene_ClassicCraftingMenu.h"
+  "${_MS_SRC}/../Minecraft.Client/Common/UI/UIScene_ClassicCraftingMenu.cpp"
+  "${_MS_SRC}/../Minecraft.Client/Common/UI/UIScene_ClassicCraftingMenu.h"
   "${_MS_SRC}/../Minecraft.Client/Common/UI/UIString.cpp"
   "${_MS_SRC}/../Minecraft.Client/Common/UI/UITTFFont.cpp"
   "${_MS_SRC}/../Minecraft.Client/Common/zlib/adler32.c"
