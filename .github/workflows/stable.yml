@@ -2,8 +2,8 @@ name: Stable Release
 
 on:
   push:
-    branches:
-      - main
+    paths:
+      - 'BUMP' #neo: this is a file. edit it. contains version number
   workflow_dispatch:
 
 permissions:
@@ -221,33 +221,21 @@ jobs:
           artifacts/neoLegacyServerWindows64.zip
           artifacts/neoLegacyServerWindows64-FourKit.zip
 
-    - name: Get short SHA
-      id: sha
-      run: echo "short=$(echo '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
-
-    - name: Delete old release
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: gh release delete Stable-Dedicated-Server --yes || true
-
-    - name: Delete old tag
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: gh api repos/${{ github.repository }}/git/refs/tags/Stable-Dedicated-Server --method DELETE || true
-
     - name: Create tag
       run: |
+        VERSION=v$(cat BUMP)
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git tag -f Stable-Dedicated-Server -m "Stable server release ${{ steps.sha.outputs.short }}"
-        git push origin Stable-Dedicated-Server --force
+        git tag -f $VERSION-Dedicated-Server -m "$VERSION server"
+        git push origin $VERSION-Dedicated-Server --force
 
     - name: Create release
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create Stable-Dedicated-Server artifacts/* \
-          --title "Server: ${{ steps.sha.outputs.short }}" \
+        VERSION=v$(cat BUMP)
+        gh release create $VERSION-Dedicated-Server artifacts/* \
+          --title "$(VERSION) Server" \
           --notes "Dedicated Server runtime for Windows64.
 
         Two flavours are attached:
@@ -278,26 +266,13 @@ jobs:
           subject-path: |
             artifacts/neoLegacyWindows64.zip
 
-      - name: Get short SHA
-        id: sha
-        run: echo "short=$(echo '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
-
-      - name: Delete old release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release delete Stable --yes || true
-
-      - name: Delete old tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh api repos/${{ github.repository }}/git/refs/tags/Stable --method DELETE || true
-
       - name: Create tag
         run: |
+          VERSION=v$(cat BUMP)
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -f Stable -m "Stable release ${{ steps.sha.outputs.short }}"
-          git push origin Stable --force
+          git tag -f $VERSION -m "Stable release $VERSION"
+          git push origin $VERSION --force
 
       - name: Write release notes
         run: |
@@ -326,13 +301,15 @@ jobs:
             - Local Port: `25565`
             - Proxy Protocol: `None`
           - After creating your tunnel, navigate to the "Tunnels" main page. You'll see the IP address and port for your tunnel. This is what your friends will input when adding your server in order to join your online game!
+          NOTES
 
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create Stable artifacts/* \
-            --title "Client: ${{ steps.sha.outputs.short }}" \
+          VERSION=v$(cat BUMP)
+          gh release create $VERSION artifacts/* \
+            --title "$VERSION" \
             --notes-file notes.md
 
   cleanup:
